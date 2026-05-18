@@ -3,51 +3,63 @@ import sys
 from sqlalchemy import text
 from app.core.database import engine, Base, SessionLocal
 from app.models.bill import Bill
+from app.models.category import Category
 from app.config import settings
+
+
+DEFAULT_CATEGORIES = [
+    {"name": "餐饮", "icon": "🍜", "color": "#FF6B6B", "keywords": "餐厅,外卖,美食,饭,面,火锅,烧烤,奶茶,咖啡,早餐,午餐,晚餐,小吃,食堂,快餐,烘焙,甜品,饮品"},
+    {"name": "交通", "icon": "🚇", "color": "#4ECDC4", "keywords": "地铁,公交,打车,滴滴,出租车,高铁,火车,机票,航班,加油,充电,停车,高速,ETC,共享单车,骑行"},
+    {"name": "购物", "icon": "🛒", "color": "#45B7D1", "keywords": "淘宝,京东,拼多多,超市,商场,便利店,百货,服饰,数码,电器,家具,日用品,化妆品,护肤品"},
+    {"name": "居住", "icon": "🏠", "color": "#96CEB4", "keywords": "房租,物业,水电,燃气,宽带,网费,电话费,暖气,维修,装修,家政,清洁"},
+    {"name": "娱乐", "icon": "🎮", "color": "#FFEAA7", "keywords": "电影,游戏,音乐,视频,会员,订阅,旅游,景点,演出,运动,健身,KTV,剧本杀,密室,网吧"},
+    {"name": "医疗", "icon": "💊", "color": "#DDA0DD", "keywords": "医院,药,门诊,挂号,体检,诊所,牙科,眼科,中药,西药,医保"},
+    {"name": "教育", "icon": "📚", "color": "#87CEEB", "keywords": "书,课程,培训,考试,学费,报名,文具,打印,资料"},
+    {"name": "通讯", "icon": "📱", "color": "#F0E68C", "keywords": "手机,话费,流量,充值"},
+    {"name": "收入", "icon": "💰", "color": "#90EE90", "keywords": "工资,奖金,红包,退款,报销,兼职,理财,利息,分红,转账"},
+    {"name": "其他", "icon": "📋", "color": "#C0C0C0", "keywords": ""},
+]
+
 
 def init():
     print("开始初始化数据库...")
     print(f"数据库URL: {settings.DATABASE_URL}")
-    
-    # 测试连接
+
     try:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT 1"))
-            print("✅ 数据库连接成功！")
+            print("数据库连接成功！")
     except Exception as e:
-        print(f"❌ 数据库连接失败: {e}")
+        print(f"数据库连接失败: {e}")
         print("请检查：")
         print("1. PostgreSQL服务是否启动")
         print("2. 用户名/密码是否正确")
-        print("3. 数据库 'bill_agent' 是否存在")
+        print("3. 数据库 'bill_db' 是否存在")
         print(f"4. 连接字符串: {settings.DATABASE_URL}")
         return
-    
-    # 创建表
+
     try:
-        # 先删除所有表（开发环境）
         print("正在删除现有表...")
         Base.metadata.drop_all(bind=engine)
-        
-        # 创建新表
+
         print("正在创建表...")
         Base.metadata.create_all(bind=engine)
-        
-        print("✅ 数据库表创建完成！")
-        
-        # 可选：插入测试数据
+
+        print("数据库表创建完成！")
+
         with SessionLocal() as session:
-            # 这里可以插入一些测试数据
-            # 例如：
-            # test_bill = Bill(amount=100.0, description="测试账单")
-            # session.add(test_bill)
+            for cat_data in DEFAULT_CATEGORIES:
+                existing = session.query(Category).filter(Category.name == cat_data["name"]).first()
+                if not existing:
+                    session.add(Category(**cat_data))
             session.commit()
-            print("✅ 测试数据插入完成！")
-            
+            print(f"已种子 {len(DEFAULT_CATEGORIES)} 个默认分类")
+
     except Exception as e:
-        print(f"❌ 创建表时出错: {e}")
+        print(f"创建表时出错: {e}")
         import traceback
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     init()

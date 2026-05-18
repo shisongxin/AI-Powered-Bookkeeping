@@ -2,10 +2,10 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
-from typing import Dict
 class BillBase(BaseModel):
     amount: float
-    category: str
+    category: str = "未分类"
+    category_id: Optional[int] = None
     note: Optional[str] = None
     raw_text: Optional[str] = None
     transaction_date: Optional[datetime] = None
@@ -16,7 +16,17 @@ class BillCreate(BillBase):
 class BillResponse(BillBase):
     id: int
     created_at: datetime
-    
+    direction: Optional[str] = None
+    payee: Optional[str] = None
+    description: Optional[str] = None
+    transaction_type: Optional[str] = None
+    payment_method: Optional[str] = None
+    transaction_status: Optional[str] = None
+    transaction_id: Optional[str] = None
+    merchant_order_id: Optional[str] = None
+    remark: Optional[str] = None
+    source_file_type: Optional[str] = None
+
     class Config:
         from_attributes = True
         

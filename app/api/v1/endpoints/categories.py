@@ -1,8 +1,48 @@
 # app/api/v1/endpoints/categories.py
-from fastapi import APIRouter
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.services.category_service import CategoryService
+from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
-@router.get("/")
-async def get_categories():
-    return [{"id": 1, "name": "餐饮"}, {"id": 2, "name": "购物"}]
+
+@router.post("/", response_model=CategoryResponse, status_code=201)
+def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
+    svc = CategoryService(db)
+    return svc.create(data)
+
+
+@router.get("/", response_model=list[CategoryResponse])
+def get_categories(db: Session = Depends(get_db)):
+    svc = CategoryService(db)
+    return svc.get_all()
+
+
+@router.get("/{category_id}", response_model=CategoryResponse)
+def get_category(category_id: int, db: Session = Depends(get_db)):
+    svc = CategoryService(db)
+    cat = svc.get(category_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="分类不存在")
+    return cat
+
+
+@router.put("/{category_id}", response_model=CategoryResponse)
+def update_category(category_id: int, data: CategoryUpdate, db: Session = Depends(get_db)):
+    svc = CategoryService(db)
+    cat = svc.update(category_id, data)
+    if not cat:
+        raise HTTPException(status_code=404, detail="分类不存在")
+    return cat
+
+
+@router.delete("/{category_id}")
+def delete_category(category_id: int, db: Session = Depends(get_db)):
+    svc = CategoryService(db)
+    ok = svc.delete(category_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="分类不存在")
+    return {"detail": "已删除"}
