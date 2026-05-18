@@ -5,7 +5,7 @@ from typing import List, Dict, Optional
 from datetime import datetime
 import chardet
 
-from app.schemas.bill import UnifiedBillRecord
+from app.schemas.bill import FlexibleBillRecord
 
 
 class AlipayBillParser:
@@ -31,7 +31,7 @@ class AlipayBillParser:
     }
 
     @classmethod
-    def parse(cls, file_path: str) -> List[UnifiedBillRecord]:
+    def parse(cls, file_path: str) -> List[FlexibleBillRecord]:
         """
         解析支付宝账单CSV文件，返回统一格式的账单记录列表
         """
@@ -68,7 +68,7 @@ class AlipayBillParser:
         return records
 
     @classmethod
-    def _parse_row(cls, row: List[str], col_index: Dict[str, int]) -> Optional[UnifiedBillRecord]:
+    def _parse_row(cls, row: List[str], col_index: Dict[str, int]) -> Optional[FlexibleBillRecord]:
         """解析单行交易记录"""
         try:
             transaction_date_str = row[col_index.get('交易时间', -1)].strip()
@@ -86,13 +86,13 @@ class AlipayBillParser:
             # 解析金额（支付宝金额已带符号，如 -23.50）
             amount_numeric = float(amount_str)
 
-            return UnifiedBillRecord(
+            return FlexibleBillRecord(
                 transaction_date=transaction_date,
                 transaction_type=row[col_index.get('交易分类', -1)].strip(),
                 payee=row[col_index.get('交易对方', -1)].strip(),
                 description=row[col_index.get('商品说明', -1)].strip(),
                 direction=direction,
-                amount_numeric=amount_numeric,
+                amount=amount_numeric,
                 payment_method=row[col_index.get('收/付款方式', -1)].strip(),
                 transaction_status=transaction_status,
                 transaction_id=row[col_index.get('交易订单号', -1)].strip(),
@@ -105,6 +105,6 @@ class AlipayBillParser:
             return None
 
 
-def parse_alipay_bill(file_path: str) -> List[UnifiedBillRecord]:
+def parse_alipay_bill(file_path: str) -> List[FlexibleBillRecord]:
     """便捷函数：解析支付宝账单"""
     return AlipayBillParser.parse(file_path)

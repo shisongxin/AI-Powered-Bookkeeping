@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.schemas.bill import UnifiedBillRecord
+from app.schemas.bill import FlexibleBillRecord
 
 
 class WeChatBillParser:
@@ -32,7 +32,7 @@ class WeChatBillParser:
     }
 
     @classmethod
-    def parse(cls, file_path: Union[str, Path]) -> List[UnifiedBillRecord]:
+    def parse(cls, file_path: Union[str, Path]) -> List[FlexibleBillRecord]:
         """
         解析微信账单文件，自动识别 CSV 或 Excel 格式，返回统一格式的账单记录列表
         """
@@ -47,7 +47,7 @@ class WeChatBillParser:
             raise ValueError(f"不支持的文件格式: {file_path.suffix}，仅支持 .csv / .xlsx / .xls")
     
     @classmethod
-    def _parse_csv(cls, file_path: Path) -> List[UnifiedBillRecord]:
+    def _parse_csv(cls, file_path: Path) -> List[FlexibleBillRecord]:
         """解析 CSV 格式的微信账单"""
         records = []
         
@@ -73,7 +73,7 @@ class WeChatBillParser:
         return records
     
     @classmethod
-    def _parse_excel(cls, file_path: Path) -> List[UnifiedBillRecord]:
+    def _parse_excel(cls, file_path: Path) -> List[FlexibleBillRecord]:
         """
         解析 Excel 格式的微信账单（.xlsx / .xls）
         
@@ -107,7 +107,7 @@ class WeChatBillParser:
         return records
     
     @classmethod
-    def _parse_row_excel(cls, row: pd.Series) -> Optional[UnifiedBillRecord]:
+    def _parse_row_excel(cls, row: pd.Series) -> Optional[FlexibleBillRecord]:
         """解析 Excel 格式的单行交易记录"""
         try:
             transaction_date_str = cls._safe_get(row, '交易时间')
@@ -127,13 +127,13 @@ class WeChatBillParser:
             # 解析金额
             amount_numeric = cls._parse_amount(amount_str, direction)
             
-            return UnifiedBillRecord(
+            return FlexibleBillRecord(
                 transaction_date=transaction_date,
                 transaction_type=cls._safe_get(row, '交易类型'),
                 payee=cls._safe_get(row, '交易对方'),
                 description=cls._safe_get(row, '商品'),
                 direction=direction,
-                amount_numeric=amount_numeric,
+                amount=amount_numeric,
                 payment_method=cls._safe_get(row, '支付方式'),
                 transaction_status=transaction_status,
                 transaction_id=cls._safe_get(row, '交易单号'),
@@ -146,7 +146,7 @@ class WeChatBillParser:
             return None
     
     @classmethod
-    def _parse_row(cls, row: List[str], col_index: Dict[str, int], source_type: str = 'csv') -> Optional[UnifiedBillRecord]:
+    def _parse_row(cls, row: List[str], col_index: Dict[str, int], source_type: str = 'csv') -> Optional[FlexibleBillRecord]:
         """解析 CSV 格式的单行交易记录"""
         try:
             transaction_date_str = row[col_index.get('交易时间', -1)].strip()
@@ -164,13 +164,13 @@ class WeChatBillParser:
             # 解析金额
             amount_numeric = cls._parse_amount(amount_str, direction)
             
-            return UnifiedBillRecord(
+            return FlexibleBillRecord(
                 transaction_date=transaction_date,
                 transaction_type=row[col_index.get('交易类型', -1)].strip(),
                 payee=row[col_index.get('交易对方', -1)].strip(),
                 description=row[col_index.get('商品', -1)].strip(),
                 direction=direction,
-                amount_numeric=amount_numeric,
+                amount=amount_numeric,
                 payment_method=row[col_index.get('支付方式', -1)].strip(),
                 transaction_status=transaction_status,
                 transaction_id=row[col_index.get('交易单号', -1)].strip(),
@@ -232,6 +232,6 @@ class WeChatBillParser:
         return amount
 
 
-def parse_wechat_bill(file_path: Union[str, Path]) -> List[UnifiedBillRecord]:
+def parse_wechat_bill(file_path: Union[str, Path]) -> List[FlexibleBillRecord]:
     """便捷函数：解析微信账单（自动识别 CSV/Excel）"""
     return WeChatBillParser.parse(file_path)

@@ -1,18 +1,27 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Text
-from sqlalchemy.orm import relationship
+# app/models/bill.py
+
+from sqlalchemy import Column, Integer, String, Float, DateTime, Text
 from datetime import datetime
+
 from app.core.database import Base
+
 
 class Bill(Base):
     __tablename__ = "bills"
-    
     id = Column(Integer, primary_key=True, index=True)
     amount = Column(Float, nullable=False)
-    category = Column(String(50), nullable=False)
-    note = Column(String(255), nullable=True)
+    category = Column(String, nullable=True)
+    note = Column(Text, nullable=True)
     raw_text = Column(Text, nullable=True)
-    transaction_date = Column(DateTime, default=datetime.now)
+    transaction_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.now)
-    
-    # 可选的用户ID字段，为未来多用户预留
-    # user_id = Column(Integer, ForeignKey("users.id"))
+    direction = Column(String, nullable=True)
+    payee = Column(String, nullable=True)
+    description = Column(Text, nullable=True)
+    transaction_type = Column(String, nullable=True)
+    payment_method = Column(String, nullable=True)
+    transaction_status = Column(String, nullable=True)
+    transaction_id = Column(String, unique=True, nullable=True)
+    merchant_order_id = Column(String, nullable=True)
+    remark = Column(Text, nullable=True)
+    source_file_type = Column(String, nullable=True)
