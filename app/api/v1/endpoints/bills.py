@@ -13,15 +13,16 @@ import logging
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/bills", tags=["bills"])
 ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".pdf"}
-# 创建账单列表接口
+
 @router.post("/", response_model=BillResponse)
 def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
+    """创建账单列表"""
     service = BillService(db)
     return service.create_bill(bill)
 
-# 获取账单列表接口
 @router.get("/", response_model=list[BillResponse])
 def get_bills(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    """获取账单列表"""
     service = BillService(db)
     return service.get_bills(skip=skip, limit=limit)
 

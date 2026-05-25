@@ -201,7 +201,7 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | GET | `/api/v1/statistics/monthly-summary` | 月度收支汇总 |
 | GET | `/api/v1/statistics/by-category` | 按分类统计 |
 | GET | `/api/v1/statistics/trend` | 消费趋势 |
-| POST | `/api/v1/chat/` | AI 对话（待开发） |
+| POST | `/api/v1/chat/` | AI 对话记账（Function Calling） |
 
 ## 默认分类
 
@@ -218,9 +218,50 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | 收入 | 工资, 奖金, 红包, 退款, 报销 |
 | 其他 | （无关键词，作为兜底分类） |
 
+## AI 对话记账
+
+配置 LLM 后，可通过自然语言进行记账查询和记录。
+
+### 配置 LLM
+
+在 `.env` 中设置 API Key（支持任何 OpenAI 兼容接口）：
+
+```env
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_BASE_URL=https://api.openai.com/v1    # 可切换为其他兼容服务
+LLM_MODEL=gpt-4o-mini                         # 模型名称
+```
+
+支持的 LLM 服务：OpenAI / Azure OpenAI / Ollama / LM Studio / DeepSeek 等任何 OpenAI API 格式服务。
+
+### 对话示例
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat/" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "我这个月餐饮花了多少？"}'
+# → AI 自动调用 get_category_breakdown 工具查询，生成自然语言回复
+
+curl -X POST "http://localhost:8000/api/v1/chat/" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "午餐在麦当劳花了35元", "session_id": "abc123"}'
+# → AI 自动调用 create_bill 工具记账，支持多轮对话
+```
+
+### 可调用的工具
+
+| 工具 | 触发示例 |
+|---|---|
+| `query_bills` | "最近一周的账单"、"查五月份餐饮支出" |
+| `create_bill` | "今天午餐花了35元"、"记录一笔收入5000" |
+| `get_monthly_summary` | "这个月花了多少"、"五月份收支情况" |
+| `get_category_breakdown` | "餐饮占比多少"、"各分类分布" |
+| `get_trend` | "最近6个月的趋势"、"这周每天开销" |
+| `list_categories` | "有哪些分类"、"可用的分类" |
+
 ## 计划中的功能
 
-- [ ] **AI 记账对话** — 接入 LLM（RAG 模式），支持自然语言记账查询
+- [x] **AI 记账对话** — 接入 LLM Function Calling，支持自然语言记账查询
 - [ ] **OCR 图片识别** — 上传账单截图自动识别交易信息
 - [ ] **语音记账** — 语音输入转文字后自动生成账单记录
 - [ ] **月度预算规划** — 基于历史消费数据 AI 生成下月预算建议

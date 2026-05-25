@@ -18,8 +18,14 @@ class Settings(BaseSettings):
         "postgresql+psycopg2://postgres:697012@localhost:5432/bill_db"
     )
     
+    # LLM 配置（OpenAI 兼容接口，可切换 Ollama / LM Studio / 国产模型）
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "19d299b045ee418e823d04b10b8be8c7.xblqgSBjzZAfMdgi")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "glm-5.1")
+    LLM_MAX_TOKENS: int = 1024
+    LLM_TEMPERATURE: float = 0.7
+
     # 后续 RAG 相关配置预留
-    OPENAI_API_KEY: str = ""
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     
     class Config:

@@ -22,6 +22,7 @@ def monthly_summary(
     month: int = Query(..., ge=1, le=12),
     db: Session = Depends(get_db),
 ):
+    """月度收支汇总"""
     svc = StatisticsService(db)
     return svc.monthly_summary(year, month)
 
@@ -33,6 +34,7 @@ def category_breakdown(
     direction: str = Query("支出", pattern="^(支出|收入)$"),
     db: Session = Depends(get_db),
 ):
+    """按分类统计（饼图数据）"""
     svc = StatisticsService(db)
     return svc.category_breakdown(start_date, end_date, direction)
 
@@ -44,5 +46,6 @@ def trend(
     granularity: str = Query("monthly", pattern="^(daily|weekly|monthly)$"),
     db: Session = Depends(get_db),
 ):
+    """消费趋势（daily/weekly/monthly）"""
     svc = StatisticsService(db)
     return svc.trend(start_date, end_date, granularity)

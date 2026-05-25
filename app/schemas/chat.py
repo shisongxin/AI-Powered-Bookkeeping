@@ -1,0 +1,25 @@
+# app/schemas/chat.py
+
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
+
+class ChatRequest(BaseModel):
+    """用户发送的聊天消息"""
+    message: str = Field(..., description="用户输入的自然语言消息")
+    session_id: Optional[str] = Field(None, description="会话 ID，用于多轮对话上下文")
+
+
+class ToolCallRecord(BaseModel):
+    """单次工具调用的记录，展示在响应中用于调试和透明度"""
+    tool_name: str = Field(..., description="被调用的工具名称")
+    arguments: dict = Field(default_factory=dict, description="工具调用参数")
+    result: Optional[str] = Field(None, description="工具返回结果（截断摘要）")
+
+
+class ChatResponse(BaseModel):
+    """聊天回复，包含 AI 回复和可选的工具调用追踪"""
+    reply: str = Field(..., description="AI 生成的自然语言回复")
+    session_id: Optional[str] = Field(None, description="当前会话 ID")
+    tool_calls: List[ToolCallRecord] = Field(default_factory=list, description="本轮调用的工具列表")
+    done: bool = Field(True, description="是否已完成本轮对话")

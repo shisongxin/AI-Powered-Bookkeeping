@@ -11,18 +11,21 @@ router = APIRouter(prefix="/categories", tags=["categories"])
 
 @router.post("/", response_model=CategoryResponse, status_code=201)
 def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
+    """创建分类"""
     svc = CategoryService(db)
     return svc.create(data)
 
 
 @router.get("/", response_model=list[CategoryResponse])
 def get_categories(db: Session = Depends(get_db)):
+    """获取当前所有分类"""
     svc = CategoryService(db)
     return svc.get_all()
 
 
 @router.get("/{category_id}", response_model=CategoryResponse)
 def get_category(category_id: int, db: Session = Depends(get_db)):
+    """查询id所对应的分类"""
     svc = CategoryService(db)
     cat = svc.get(category_id)
     if not cat:
@@ -32,6 +35,7 @@ def get_category(category_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{category_id}", response_model=CategoryResponse)
 def update_category(category_id: int, data: CategoryUpdate, db: Session = Depends(get_db)):
+    """更新分类"""
     svc = CategoryService(db)
     cat = svc.update(category_id, data)
     if not cat:
@@ -41,6 +45,7 @@ def update_category(category_id: int, data: CategoryUpdate, db: Session = Depend
 
 @router.post("/match", response_model=MatchResponse)
 def match_category(data: MatchRequest, db: Session = Depends(get_db)):
+    """自动匹配当前已有分类"""
     svc = CategoryService(db)
     matched = svc.auto_match(data.text)
     if matched is None:
@@ -50,6 +55,7 @@ def match_category(data: MatchRequest, db: Session = Depends(get_db)):
 
 @router.delete("/{category_id}")
 def delete_category(category_id: int, db: Session = Depends(get_db)):
+    """删除分类"""
     svc = CategoryService(db)
     ok = svc.delete(category_id)
     if not ok:
