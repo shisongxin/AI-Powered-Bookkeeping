@@ -29,3 +29,12 @@ class CategoryResponse(CategoryBase):
 
     class Config:
         from_attributes = True
+
+
+class MatchRequest(BaseModel):
+    text: str
+
+
+class MatchResponse(BaseModel):
+    matched: bool
+    category: Optional[CategoryResponse] = None

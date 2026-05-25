@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.category_service import CategoryService
-from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse
+from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse, MatchRequest, MatchResponse
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
@@ -37,6 +37,15 @@ def update_category(category_id: int, data: CategoryUpdate, db: Session = Depend
     if not cat:
         raise HTTPException(status_code=404, detail="分类不存在")
     return cat
+
+
+@router.post("/match", response_model=MatchResponse)
+def match_category(data: MatchRequest, db: Session = Depends(get_db)):
+    svc = CategoryService(db)
+    matched = svc.auto_match(data.text)
+    if matched is None:
+        return MatchResponse(matched=False)
+    return MatchResponse(matched=True, category=CategoryResponse.model_validate(matched))
 
 
 @router.delete("/{category_id}")

@@ -1,6 +1,6 @@
 # BillAgent — AI-Powered Bookkeeping
 
-智能记账助手，支持多格式账单文件导入、自动分类、AI 对话、消费分析和预算规划功能。
+智能记账助手，支持多格式账单文件导入、自动分类、统计分析、AI 对话、消费分析和预算规划功能。
 
 ## 技术栈
 
@@ -9,9 +9,10 @@
 | Web 框架 | FastAPI 0.115 |
 | ORM | SQLAlchemy 2.0（同步模式） |
 | 数据库 | PostgreSQL + psycopg2 |
+| 迁移工具 | Alembic 1.13 |
 | 数据解析 | pandas, pdfplumber, chardet |
 | 配置管理 | pydantic-settings + python-dotenv |
-| 测试 | pytest + httpx |
+| 测试 | pytest 8.3 + httpx |
 
 ## 项目结构
 
@@ -26,22 +27,30 @@ app/
 │   └── category.py            # Category ORM 模型（categories 表）
 ├── schemas/
 │   ├── bill.py                # Pydantic 模型（请求/响应 + 解析中间格式）
-│   └── category.py            # Category Pydantic 模型
+│   ├── category.py            # Category Pydantic 模型
+│   └── statistics.py          # 统计查询响应模型
 ├── services/
 │   ├── bill_service.py        # 账单业务逻辑（创建、导入、去重、自动分类）
-│   └── category_service.py    # 分类业务逻辑（CRUD + 关键词自动匹配）
+│   ├── category_service.py    # 分类业务逻辑（CRUD + 关键词自动匹配）
+│   └── statistics_service.py  # 统计业务逻辑（月度汇总、分类饼图、趋势）
 ├── api/v1/endpoints/
 │   ├── bills.py               # 账单 CRUD + 文件上传解析
 │   ├── categories.py          # 分类 CRUD（完整增删改查）
+│   ├── statistics.py          # 统计查询（月度汇总/分类饼图/消费趋势）
 │   └── chat.py                # AI 对话接口（待集成 RAG）
 └── utils/
     ├── bill_parser.py          # 通用账单解析器（Excel/CSV/PDF）
     ├── wechat_parser.py        # 微信账单专用解析器
     └── alipay_parser.py        # 支付宝账单专用解析器
+alembic/
+├── env.py                     # Alembic 环境配置（读取项目 DB URL）
+└── versions/                  # 迁移脚本目录
 tests/
+├── conftest.py                # 共享 fixtures（SQLite 内存库 + TestClient）
 ├── test_parsers.py            # 解析器测试
-└── test_categories.py         # 分类系统 + 自动分类测试（27 个用例）
-init_db.py                     # 数据库初始化 + 种子数据
+├── test_categories.py         # 分类系统测试（27 个用例）
+└── test_statistics.py         # 统计 API 测试（12 个用例）
+init_db.py                     # 数据库初始化（Alembic 迁移 + 种子数据）
 requirements.txt               # Python 依赖
 ```
 
@@ -72,7 +81,7 @@ DATABASE_URL=postgresql+psycopg2://postgres:697012@localhost:5432/bill_db
 python init_db.py
 ```
 
-脚本会自动创建表并种子 10 个默认分类（餐饮、交通、购物、居住、娱乐、医疗、教育、通讯、收入、其他）。
+脚本会运行 `alembic upgrade head` 创建所有表，然后种子 10 个默认分类。
 
 ### 5. 启动服务
 
@@ -88,35 +97,74 @@ uvicorn app.main:app --reload
 pytest tests/ -v
 ```
 
+当前 39 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询等核心功能。
+
+## 数据库迁移
+
+项目使用 Alembic 管理数据库版本，迁移脚本位于 `alembic/versions/`。
+
+```bash
+# 生成新迁移（模型变更后）
+alembic revision --autogenerate -m "描述"
+
+# 应用迁移到最新版本
+alembic upgrade head
+
+# 回滚一个版本
+alembic downgrade -1
+
+# 查看迁移历史
+alembic history
+```
+
 ## 已实现功能
 
 ### 分类管理系统
 
 完整的分类 CRUD，支持通过关键词自动匹配账单到对应分类。
 
-- `POST /api/v1/categories/` — 创建分类
-- `GET /api/v1/categories/` — 分类列表
-- `GET /api/v1/categories/{id}` — 分类详情
-- `PUT /api/v1/categories/{id}` — 更新分类
-- `DELETE /api/v1/categories/{id}` — 删除分类
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/categories/` | 创建分类 |
+| GET | `/api/v1/categories/` | 分类列表 |
+| GET | `/api/v1/categories/{id}` | 分类详情 |
+| PUT | `/api/v1/categories/{id}` | 更新分类 |
+| DELETE | `/api/v1/categories/{id}` | 删除分类 |
+| POST | `/api/v1/categories/match` | 文本自动匹配分类 |
 
-**自动分类机制**：每个分类维护一组关键词（逗号分隔），导入账单时自动遍历所有分类，取关键词匹配数最高的分类。若无法匹配，则回退到账单原始 `transaction_type` 或"未分类"。
+**自动分类机制**：每个分类维护一组关键词（逗号分隔），导入账单时遍历所有分类取最高匹配度。无法匹配则回退到 `transaction_type` 或"未分类"。
 
 ### 账单文件上传 & 自动解析
 
 `POST /api/v1/bills/upload` — 上传账单文件，自动识别格式、解析、分类、去重、入库。
 
-- **支持格式**：CSV / Excel (.xlsx, .xls) / PDF
-- **自动识别**：文件编码（UTF-8 / GBK 等）、表头行位置、字段映射
-- **自动分类**：基于交易对方、商品描述等文本自动匹配分类
-- **去重机制**：基于交易单号或日期+金额+交易对方组合去重
-- **解析流程**：
-  1. 上传文件保存为临时文件
-  2. `UniversalBillParser` 自动识别文件类型和表头
-  3. 逐行提取日期、金额、交易对方、收支方向等字段
-  4. `CategoryService.auto_match()` 自动匹配分类
-  5. 通过 `BillService.import_from_parsed_records()` 批量入库
-  6. 删除临时文件
+- 支持 CSV / Excel (.xlsx, .xls) / PDF
+- 自动识别文件编码、表头行位置、字段映射
+- 解析后自动匹配分类，基于交易单号或日期+金额+对方去重
+
+### 统计数据 API
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/v1/statistics/monthly-summary?year=&month=` | 月度收支汇总 |
+| GET | `/api/v1/statistics/by-category?start_date=&end_date=&direction=` | 按分类统计（饼图数据） |
+| GET | `/api/v1/statistics/trend?start_date=&end_date=&granularity=` | 消费趋势（daily/weekly/monthly） |
+
+**使用示例**：
+
+```bash
+# 查询 2026年5月 月度汇总
+curl "http://localhost:8000/api/v1/statistics/monthly-summary?year=2026&month=5"
+# → {"year":2026,"month":5,"income":5300.0,"expense":352.0,"net":4948.0,"transaction_count":7}
+
+# 查询 5月 支出分类分布
+curl "http://localhost:8000/api/v1/statistics/by-category?start_date=2026-05-01&end_date=2026-05-31&direction=支出"
+# → [{"category":"餐饮","amount":137.0,"count":3,"percentage":38.9}, ...]
+
+# 查询上半年月度趋势
+curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_date=2026-06-30&granularity=monthly"
+# → [{"period":"2026-05","income":5300.0,"expense":352.0,"net":4948.0}, ...]
+```
 
 ### 账单数据字段
 
@@ -136,13 +184,7 @@ pytest tests/ -v
 | merchant_order_id | 商户单号 |
 | remark | 备注 |
 
-### 解析器
-
-- **`UniversalBillParser`**（推荐）：自动适配各类账单，通过关键词匹配表头和字段，无需预先知道来源格式
-- **`WeChatBillParser`**：微信账单专用，按微信固定格式（跳过前 16/17 行）解析
-- **`AlipayBillParser`**：支付宝账单专用，按支付宝固定格式（跳过前 24 行）解析
-
-### API 端点一览
+### 全部 API 端点
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -155,6 +197,10 @@ pytest tests/ -v
 | GET | `/api/v1/categories/{id}` | 分类详情 |
 | PUT | `/api/v1/categories/{id}` | 更新分类 |
 | DELETE | `/api/v1/categories/{id}` | 删除分类 |
+| POST | `/api/v1/categories/match` | 文本自动匹配分类 |
+| GET | `/api/v1/statistics/monthly-summary` | 月度收支汇总 |
+| GET | `/api/v1/statistics/by-category` | 按分类统计 |
+| GET | `/api/v1/statistics/trend` | 消费趋势 |
 | POST | `/api/v1/chat/` | AI 对话（待开发） |
 
 ## 默认分类
@@ -174,10 +220,7 @@ pytest tests/ -v
 
 ## 计划中的功能
 
-- [ ] **统计数据 API** — 月度收支汇总、按分类饼图数据、消费趋势
 - [ ] **AI 记账对话** — 接入 LLM（RAG 模式），支持自然语言记账查询
 - [ ] **OCR 图片识别** — 上传账单截图自动识别交易信息
 - [ ] **语音记账** — 语音输入转文字后自动生成账单记录
-- [ ] **消费趋势分析** — 基于历史账单数据生成可视化图表
-- [ ] **月度预算规划** — 智能生成下月预算建议
-- [ ] **数据库迁移管理** — 引入 Alembic 做版本化迁移
+- [ ] **月度预算规划** — 基于历史消费数据 AI 生成下月预算建议

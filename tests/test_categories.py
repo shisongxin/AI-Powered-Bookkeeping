@@ -2,68 +2,26 @@
 
 import sys
 import os
+# 将项目根目录添加到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from fastapi.testclient import TestClient
 
-from app.core.database import Base, get_db
-from app.models.bill import Bill
-from app.models.category import Category
 from app.schemas.bill import FlexibleBillRecord
 from app.schemas.category import CategoryCreate, CategoryUpdate
 from app.services.category_service import CategoryService
 from app.services.bill_service import BillService
-from app.main import app
-
-
-# ---------- SQLite 内存数据库 ----------
-
-SQLITE_URL = "sqlite:///./test_categories.db"
-engine = create_engine(SQLITE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    finally:
-        db.close()
-
-
-app.dependency_overrides[get_db] = override_get_db
-client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def setup_db():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db():
-    session = TestingSessionLocal()
-    yield session
-    session.close()
 
 
 # ---------- 种子数据辅助 ----------
 
 SEED_CATEGORIES = [
-    {"name": "餐饮", "icon": "🍜", "color": "#FF6B6B", "keywords": "餐厅,外卖,美食,饭,面,火锅,奶茶,咖啡,早餐,午餐,晚餐"},
-    {"name": "交通", "icon": "🚇", "color": "#4ECDC4", "keywords": "地铁,公交,打车,滴滴,出租车,高铁,火车,机票"},
-    {"name": "购物", "icon": "🛒", "color": "#45B7D1", "keywords": "淘宝,京东,超市,商场,便利店"},
-    {"name": "收入", "icon": "💰", "color": "#90EE90", "keywords": "工资,奖金,红包,退款,报销"},
-    {"name": "其他", "icon": "📋", "color": "#C0C0C0", "keywords": ""},
+    {"name": "餐饮", "icon": "", "color": "#FF6B6B", "keywords": "餐厅,外卖,美食,饭,面,火锅,奶茶,咖啡,早餐,午餐,晚餐"},
+    {"name": "交通", "icon": "", "color": "#4ECDC4", "keywords": "地铁,公交,打车,滴滴,出租车,高铁,火车,机票"},
+    {"name": "购物", "icon": "", "color": "#45B7D1", "keywords": "淘宝,京东,超市,商场,便利店"},
+    {"name": "收入", "icon": "", "color": "#90EE90", "keywords": "工资,奖金,红包,退款,报销"},
+    {"name": "其他", "icon": "", "color": "#C0C0C0", "keywords": ""},
 ]
 
 
@@ -78,10 +36,9 @@ def seed_categories(db):
 class TestCategoryService:
     def test_create(self, db):
         svc = CategoryService(db)
-        cat = svc.create(CategoryCreate(name="餐饮", icon="🍜", keywords="外卖,火锅"))
+        cat = svc.create(CategoryCreate(name="餐饮", keywords="外卖,火锅"))
         assert cat.id is not None
         assert cat.name == "餐饮"
-        assert cat.icon == "🍜"
 
     def test_create_duplicate_name_raises(self, db):
         svc = CategoryService(db)
@@ -150,9 +107,7 @@ class TestAutoCategorize:
     def test_match_highest_score_wins(self, db):
         seed_categories(db)
         svc = CategoryService(db)
-        # "咖啡" 匹配 餐饮，但如果在超市买咖啡，应该匹配到购物
         matched = svc.auto_match("超市 咖啡")
-        # 超市和咖啡各1票，先创建的先匹配（餐饮先于购物），但分数相同时取第一个
         assert matched is not None
         assert matched.name in ("餐饮", "购物")
 
@@ -171,7 +126,6 @@ class TestAutoCategorize:
     def test_category_without_keywords_skipped(self, db):
         seed_categories(db)
         svc = CategoryService(db)
-        # "其他"分类没有关键词，应该匹配不到
         matched = svc.auto_match("乱七八糟")
         assert matched is None
 
@@ -220,7 +174,6 @@ class TestBillImportWithCategory:
         bills = svc.get_bills()
         assert len(bills) == 3
 
-        # 验证自动分类
         assert bills[0].category == "餐饮"
         assert bills[0].category_id is not None
         assert bills[1].category == "交通"
@@ -268,64 +221,91 @@ class TestBillImportWithCategory:
 # ========== 4. Categories API 端点测试 ==========
 
 class TestCategoriesAPI:
-    def test_create_category(self):
-        resp = client.post("/api/v1/categories/", json={
-            "name": "医疗", "icon": "💊", "keywords": "医院,药,门诊"
+    def test_create_category(self, api):
+        resp = api.post("/api/v1/categories/", json={
+            "name": "医疗", "keywords": "医院,药,门诊"
         })
         assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == "医疗"
         assert data["id"] is not None
 
-    def test_get_all_categories(self):
-        client.post("/api/v1/categories/", json={"name": "A"})
-        client.post("/api/v1/categories/", json={"name": "B"})
-        resp = client.get("/api/v1/categories/")
+    def test_get_all_categories(self, api):
+        api.post("/api/v1/categories/", json={"name": "A"})
+        api.post("/api/v1/categories/", json={"name": "B"})
+        resp = api.get("/api/v1/categories/")
         assert resp.status_code == 200
         assert len(resp.json()) == 2
 
-    def test_get_single_category(self):
-        created = client.post("/api/v1/categories/", json={"name": "教育"})
+    def test_get_single_category(self, api):
+        created = api.post("/api/v1/categories/", json={"name": "教育"})
         cat_id = created.json()["id"]
-        resp = client.get(f"/api/v1/categories/{cat_id}")
+        resp = api.get(f"/api/v1/categories/{cat_id}")
         assert resp.status_code == 200
         assert resp.json()["name"] == "教育"
 
-    def test_get_category_not_found(self):
-        resp = client.get("/api/v1/categories/99999")
+    def test_get_category_not_found(self, api):
+        resp = api.get("/api/v1/categories/99999")
         assert resp.status_code == 404
 
-    def test_update_category(self):
-        created = client.post("/api/v1/categories/", json={"name": "旧名称"})
+    def test_update_category(self, api):
+        created = api.post("/api/v1/categories/", json={"name": "旧名称"})
         cat_id = created.json()["id"]
-        resp = client.put(f"/api/v1/categories/{cat_id}", json={
+        resp = api.put(f"/api/v1/categories/{cat_id}", json={
             "name": "新名称", "color": "#ABC"
         })
         assert resp.status_code == 200
         assert resp.json()["name"] == "新名称"
         assert resp.json()["color"] == "#ABC"
 
-    def test_delete_category(self):
-        created = client.post("/api/v1/categories/", json={"name": "待删除"})
+    def test_delete_category(self, api):
+        created = api.post("/api/v1/categories/", json={"name": "待删除"})
         cat_id = created.json()["id"]
-        resp = client.delete(f"/api/v1/categories/{cat_id}")
+        resp = api.delete(f"/api/v1/categories/{cat_id}")
         assert resp.status_code == 200
-        assert client.get(f"/api/v1/categories/{cat_id}").status_code == 404
+        assert api.get(f"/api/v1/categories/{cat_id}").status_code == 404
 
-    def test_delete_not_found(self):
-        resp = client.delete("/api/v1/categories/99999")
+    def test_delete_not_found(self, api):
+        resp = api.delete("/api/v1/categories/99999")
         assert resp.status_code == 404
 
 
-# ========== 5. Bills API 端点测试 ==========
+# ========== 5. 自动分类匹配 API 测试 ==========
+
+class TestMatchAPI:
+    def test_match_found(self, api):
+        api.post("/api/v1/categories/", json={"name": "餐饮", "keywords": "外卖,餐厅,火锅"})
+        api.post("/api/v1/categories/", json={"name": "交通", "keywords": "地铁,打车,滴滴"})
+        resp = api.post("/api/v1/categories/match", json={"text": "麦当劳外卖配送费"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["matched"] is True
+        assert data["category"]["name"] == "餐饮"
+
+    def test_match_not_found(self, api):
+        api.post("/api/v1/categories/", json={"name": "餐饮", "keywords": "外卖"})
+        resp = api.post("/api/v1/categories/match", json={"text": "完全无关的文本"})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["matched"] is False
+        assert data["category"] is None
+
+    def test_match_empty_text(self, api):
+        resp = api.post("/api/v1/categories/match", json={"text": ""})
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["matched"] is False
+        assert data["category"] is None
+
+
+# ========== 6. Bills API 端点测试 ==========
 
 class TestBillsAPI:
-    def test_create_bill_with_category(self):
-        # 先创建分类
-        cat_resp = client.post("/api/v1/categories/", json={"name": "餐饮"})
+    def test_create_bill_with_category(self, api):
+        cat_resp = api.post("/api/v1/categories/", json={"name": "餐饮"})
         cat_id = cat_resp.json()["id"]
 
-        resp = client.post("/api/v1/bills/", json={
+        resp = api.post("/api/v1/bills/", json={
             "amount": 35.0,
             "category": "餐饮",
             "category_id": cat_id,
@@ -335,12 +315,12 @@ class TestBillsAPI:
         assert resp.json()["category"] == "餐饮"
         assert resp.json()["category_id"] == cat_id
 
-    def test_get_bills(self):
-        client.post("/api/v1/bills/", json={
+    def test_get_bills(self, api):
+        api.post("/api/v1/bills/", json={
             "amount": 100.0, "category": "未分类",
             "transaction_date": "2026-05-15T12:00:00",
         })
-        resp = client.get("/api/v1/bills/")
+        resp = api.get("/api/v1/bills/")
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
 
