@@ -11,6 +11,7 @@
 | 数据库 | PostgreSQL + psycopg2 |
 | 迁移工具 | Alembic 1.13 |
 | 数据解析 | pandas, pdfplumber, chardet |
+| AI 对话 | OpenAI Function Calling（兼容 智谱/DeepSeek/Ollama） |
 | 配置管理 | pydantic-settings + python-dotenv |
 | 测试 | pytest 8.3 + httpx |
 
@@ -28,16 +29,20 @@ app/
 ├── schemas/
 │   ├── bill.py                # Pydantic 模型（请求/响应 + 解析中间格式）
 │   ├── category.py            # Category Pydantic 模型
+│   ├── chat.py                # Chat 请求/响应模型
 │   └── statistics.py          # 统计查询响应模型
 ├── services/
 │   ├── bill_service.py        # 账单业务逻辑（创建、导入、去重、自动分类）
 │   ├── category_service.py    # 分类业务逻辑（CRUD + 关键词自动匹配）
+│   ├── chat_service.py        # AI 对话编排（LLM 调用 + 工具执行 + 会话管理）
+│   ├── tool_definitions.py    # 6 个工具的 OpenAI function calling 定义
+│   ├── personas.py            # 角色预设（4 种风格 + 自定义）
 │   └── statistics_service.py  # 统计业务逻辑（月度汇总、分类饼图、趋势）
 ├── api/v1/endpoints/
 │   ├── bills.py               # 账单 CRUD + 文件上传解析
-│   ├── categories.py          # 分类 CRUD（完整增删改查）
+│   ├── categories.py          # 分类 CRUD + 自动匹配
 │   ├── statistics.py          # 统计查询（月度汇总/分类饼图/消费趋势）
-│   └── chat.py                # AI 对话接口（待集成 RAG）
+│   └── chat.py                # AI 对话（非流式 + SSE 流式）
 └── utils/
     ├── bill_parser.py          # 通用账单解析器（Excel/CSV/PDF）
     ├── wechat_parser.py        # 微信账单专用解析器
@@ -46,10 +51,11 @@ alembic/
 ├── env.py                     # Alembic 环境配置（读取项目 DB URL）
 └── versions/                  # 迁移脚本目录
 tests/
-├── conftest.py                # 共享 fixtures（SQLite 内存库 + TestClient）
-├── test_parsers.py            # 解析器测试
-├── test_categories.py         # 分类系统测试（27 个用例）
-└── test_statistics.py         # 统计 API 测试（12 个用例）
+├── conftest.py                # 共享 fixtures（SQLite + TestClient）
+├── test_parsers.py            # 解析器测试（3 个用例）
+├── test_categories.py         # 分类系统测试（30 个用例）
+├── test_statistics.py         # 统计 API 测试（12 个用例）
+└── test_chat.py               # AI 对话测试（28 个用例）
 init_db.py                     # 数据库初始化（Alembic 迁移 + 种子数据）
 requirements.txt               # Python 依赖
 ```
@@ -73,6 +79,14 @@ pip install -r requirements.txt
 
 ```env
 DATABASE_URL=postgresql+psycopg2://postgres:697012@localhost:5432/bill_db
+
+# LLM 配置（支持 OpenAI / 智谱 / DeepSeek / Ollama 等兼容服务）
+OPENAI_API_KEY=sk-your-key-here
+OPENAI_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
+
+# 角色预设（可选: buddy / cat / analyst / homie / custom）
+PERSONA=buddy
 ```
 
 ### 4. 初始化数据库
@@ -97,7 +111,7 @@ uvicorn app.main:app --reload
 pytest tests/ -v
 ```
 
-当前 39 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询等核心功能。
+当前 73 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设等全部功能。
 
 ## 数据库迁移
 
@@ -201,7 +215,8 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | GET | `/api/v1/statistics/monthly-summary` | 月度收支汇总 |
 | GET | `/api/v1/statistics/by-category` | 按分类统计 |
 | GET | `/api/v1/statistics/trend` | 消费趋势 |
-| POST | `/api/v1/chat/` | AI 对话记账（Function Calling） |
+| POST | `/api/v1/chat/` | AI 对话（非流式） |
+| POST | `/api/v1/chat/stream` | AI 对话（SSE 流式 + 工具进度） |
 
 ## 默认分类
 
@@ -220,32 +235,64 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 
 ## AI 对话记账
 
-配置 LLM 后，可通过自然语言进行记账查询和记录。
+配置 LLM 后，可通过自然语言进行记账查询和记录。系统自动注入当前日期，LLM 无需猜测"今天"是哪天。
 
 ### 配置 LLM
 
-在 `.env` 中设置 API Key（支持任何 OpenAI 兼容接口）：
+在 `.env` 中设置 API Key（兼容任何 OpenAI API 格式服务）：
 
 ```env
 OPENAI_API_KEY=sk-your-key-here
-OPENAI_BASE_URL=https://api.openai.com/v1    # 可切换为其他兼容服务
-LLM_MODEL=gpt-4o-mini                         # 模型名称
+OPENAI_BASE_URL=https://api.openai.com/v1   # OpenAI / 智谱 / DeepSeek / Ollama
+LLM_MODEL=gpt-4o-mini                        # 模型名称
+PERSONA=buddy                                # 默认角色风格
 ```
 
-支持的 LLM 服务：OpenAI / Azure OpenAI / Ollama / LM Studio / DeepSeek 等任何 OpenAI API 格式服务。
+支持的 LLM 服务：OpenAI / 智谱 GLM / DeepSeek / Ollama / LM Studio 等。
 
-### 对话示例
+### 对话模式
+
+| 端点 | 说明 |
+|---|---|
+| `POST /api/v1/chat/` | 非流式：等待完整回复后一次性返回 |
+| `POST /api/v1/chat/stream` | SSE 流式：逐 token 推送，工具调用有进度提示 |
 
 ```bash
+# 非流式对话
 curl -X POST "http://localhost:8000/api/v1/chat/" \
   -H "Content-Type: application/json" \
   -d '{"message": "我这个月餐饮花了多少？"}'
-# → AI 自动调用 get_category_breakdown 工具查询，生成自然语言回复
 
+# 流式对话（推荐前端使用）
+curl -X POST "http://localhost:8000/api/v1/chat/stream" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "记一笔午餐麦当劳35元"}'
+# → SSE 事件流: status → tool_call → reply_chunk... → done
+
+# 多轮对话（传入 session_id）
 curl -X POST "http://localhost:8000/api/v1/chat/" \
   -H "Content-Type: application/json" \
-  -d '{"message": "午餐在麦当劳花了35元", "session_id": "abc123"}'
-# → AI 自动调用 create_bill 工具记账，支持多轮对话
+  -d '{"message": "晚餐花了80", "session_id": "abc123"}'
+```
+
+### 角色风格（Persona）
+
+通过 `.env` 全局配置或请求中指定 `persona` 字段切换回复风格：
+
+| persona | 名称 | 风格 |
+|---|---|---|
+| `buddy` | 毒舌搭子 | 幽默吐槽 + 网络热梗，自称"小账" |
+| `cat` | 猫咪管家 | 傲娇喵星人，说话带"喵"，自称"本喵" |
+| `analyst` | 财务分析师 | 严谨专业的数据风格，叫用户"老板" |
+| `homie` | 老铁兄弟 | 东北腔铁哥们，"老铁"、"整挺好" |
+| `custom` | 自定义 | 读取 `.env` 中 `PERSONA_CUSTOM` 的自定义 prompt |
+
+```bash
+# 请求中切换猫咪风格
+curl -X POST "http://localhost:8000/api/v1/chat/" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "今天我花了多少", "persona": "cat"}'
+# → "喵~本喵帮你查了一下，今天花了235元喵！"
 ```
 
 ### 可调用的工具
@@ -259,9 +306,15 @@ curl -X POST "http://localhost:8000/api/v1/chat/" \
 | `get_trend` | "最近6个月的趋势"、"这周每天开销" |
 | `list_categories` | "有哪些分类"、"可用的分类" |
 
+### 速度优化
+
+- 首次工具选择阶段 max_tokens=512，快速判断是否需要调工具
+- 最终回复阶段 max_tokens=1024，保证回复质量
+- System prompt 精简至 ~200 tokens，减少处理延迟
+
 ## 计划中的功能
 
-- [x] **AI 记账对话** — 接入 LLM Function Calling，支持自然语言记账查询
+- [x] **AI 记账对话** — LLM Function Calling + 流式输出 + Persona 角色系统
 - [ ] **OCR 图片识别** — 上传账单截图自动识别交易信息
 - [ ] **语音记账** — 语音输入转文字后自动生成账单记录
 - [ ] **月度预算规划** — 基于历史消费数据 AI 生成下月预算建议

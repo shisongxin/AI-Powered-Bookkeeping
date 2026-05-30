@@ -37,22 +37,25 @@ def _get_or_create_session(session_id: Optional[str]) -> tuple[str, list[dict]]:
 
 # ---------- System Prompt ----------
 
-SYSTEM_PROMPT = """你是一个智能记账助手 BillAgent，帮助用户管理和查询财务账单。
+def _build_system_prompt(persona_prompt: str = "") -> str:
+    """构建 system prompt，动态注入当前日期和可选的 persona 设定"""
+    now = datetime.now()
+    weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    today_str = now.strftime("%Y-%m-%d")
+    weekday = weekday_names[now.weekday()]
+    month_str = now.strftime("%Y年%m月")
 
-## 你的能力
-- 查询账单：按日期、分类、收支方向筛选账单记录
-- 创建账单：记录一笔新的收入或支出
-- 统计分析：月度汇总、分类分布、消费趋势
-- 分类管理：查看可用分类列表
+    base = f"""你是 BillAgent 智能记账助手。
 
-## 重要规则
-1. 金额符号：支出为负数（如 -35），收入为正数（如 5000）
-2. 日期格式：YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS
-3. 在创建账单前，如果不确定分类名称是否正确，先调用 list_categories 确认
-4. 用户提到"今天"或"本月"时，请基于当前日期推断具体日期参数
-5. 回应用户时用中文，回复简洁友好，涉及金额时标注单位（元）
-6. 查询账单后，如果结果较多，简要概括而不是逐条罗列
-"""
+当前时间: {today_str}（{weekday}） 本月: {month_str}
+
+## 规则
+- 金额: 支出负数、收入正数。日期: YYYY-MM-DD
+- 用户说"今天/本月"等词时，用上方当前时间推算具体日期
+- 记账前不确定分类名时先调 list_categories
+- 回复简短、口语化，金额带"元"
+{persona_prompt}"""
+    return base
 
 
 # ---------- Tool 执行器 ----------
@@ -220,6 +223,19 @@ class ToolExecutor:
         return json.dumps(result, ensure_ascii=False)
 
 
+# ---------- Persona（角色预设） ----------
+
+def _get_persona_prompt(persona: str) -> str:
+    """根据角色名返回对应的 system prompt 追加文本"""
+    if not persona:
+        return ""
+    from app.services.personas import get_persona
+    prompt = get_persona(persona)
+    if prompt:
+        return f"\n## 回复风格\n{prompt}"
+    return ""
+
+
 # ---------- ChatService ----------
 
 class ChatService:
@@ -234,13 +250,14 @@ class ChatService:
         )
         self.executor = ToolExecutor(db)
 
-    def chat(self, message: str, session_id: Optional[str] = None) -> dict:
+    def chat(self, message: str, session_id: Optional[str] = None, persona: str = "") -> dict:
         """处理用户消息，返回包含回复和工具调用追踪的结果"""
         sid, history = _get_or_create_session(session_id)
 
-        # 如果是新会话，添加 system prompt
+        # 新会话：构建带当前日期的 system prompt
         if not history:
-            history.append({"role": "system", "content": SYSTEM_PROMPT})
+            persona_prompt = _get_persona_prompt(persona)
+            history.append({"role": "system", "content": _build_system_prompt(persona_prompt)})
 
         # 添加用户消息
         history.append({"role": "user", "content": message})
@@ -261,26 +278,29 @@ class ChatService:
         }
 
     def _run_conversation(self, history: list[dict], tool_records: list[dict]) -> str:
-        """执行对话循环：LLM 调用 → 工具执行 → LLM 再调用，直到得到纯文本回复"""
-        # 最多循环 3 次防止无限工具调用
-        for _ in range(3):
+        """执行对话循环，工具选择用低 token，最终回复用高 token"""
+        for loop in range(3):
+            # 工具选择阶段用较小 max_tokens 加速响应
+            is_first_pass = (loop == 0)
+            max_tok = 512 if is_first_pass else settings.LLM_MAX_TOKENS
+
             response = self.client.chat.completions.create(
                 model=settings.LLM_MODEL,
                 messages=history,
                 tools=TOOLS,
                 temperature=settings.LLM_TEMPERATURE,
-                max_tokens=settings.LLM_MAX_TOKENS,
+                max_tokens=max_tok,
             )
 
             msg = response.choices[0].message
 
-            # 如果没有工具调用，返回纯文本回复
+            # 无工具调用 → 最终回复
             if not msg.tool_calls:
                 content = msg.content or ""
                 history.append({"role": "assistant", "content": content})
                 return content
 
-            # 有工具调用：记录 assistant 消息（含 tool_calls）
+            # 记录 assistant 消息（含 tool_calls）
             history.append({
                 "role": "assistant",
                 "content": msg.content,
@@ -297,26 +317,113 @@ class ChatService:
                 ],
             })
 
-            # 依次执行每个工具调用
+            # 依次执行工具调用
             for tc in msg.tool_calls:
                 tool_name = tc.function.name
                 arguments = json.loads(tc.function.arguments)
-
                 result_str = self.executor.execute(tool_name, arguments)
-
-                # 记录工具调用轨迹
                 tool_records.append({
                     "tool_name": tool_name,
                     "arguments": arguments,
-                    "result": result_str[:500],  # 截断过长结果
+                    "result": result_str[:500],
                 })
-
-                # 将工具结果添加到对话历史
                 history.append({
                     "role": "tool",
                     "tool_call_id": tc.id,
                     "content": result_str,
                 })
 
-        # 超过最大循环次数，强制 LLM 总结
         return "抱歉，处理您的请求时遇到了一些问题，请稍后重试。"
+
+    def chat_stream(self, message: str, session_id: Optional[str] = None, persona: str = ""):
+        """流式对话：生成器逐条产出 SSE 格式字符串"""
+        sid, history = _get_or_create_session(session_id)
+        if not history:
+            persona_prompt = _get_persona_prompt(persona)
+            history.append({"role": "system", "content": _build_system_prompt(persona_prompt)})
+        history.append({"role": "user", "content": message})
+
+        # Step 1: 工具选择阶段
+        yield self._sse("status", "正在分析你的问题...")
+        tool_records: list[dict] = []
+
+        for loop in range(3):
+            response = self.client.chat.completions.create(
+                model=settings.LLM_MODEL,
+                messages=history,
+                tools=TOOLS,
+                temperature=settings.LLM_TEMPERATURE,
+                max_tokens=512,
+            )
+            msg = response.choices[0].message
+
+            # 无工具调用 → 流式输出最终回复
+            if not msg.tool_calls:
+                yield self._sse("status", "正在组织回复...")
+                full_reply = ""
+                stream = self.client.chat.completions.create(
+                    model=settings.LLM_MODEL,
+                    messages=history,
+                    temperature=settings.LLM_TEMPERATURE,
+                    max_tokens=settings.LLM_MAX_TOKENS,
+                    stream=True,
+                )
+                for chunk in stream:
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        full_reply += delta.content
+                        yield self._sse("reply_chunk", delta.content)
+                history.append({"role": "assistant", "content": full_reply})
+                yield self._sse("done", json.dumps({
+                    "session_id": sid,
+                    "tool_calls": tool_records,
+                }, ensure_ascii=False))
+                return
+
+            # 有工具调用
+            history.append({
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in msg.tool_calls
+                ],
+            })
+
+            for tc in msg.tool_calls:
+                tool_name = tc.function.name
+                arguments = json.loads(tc.function.arguments)
+                yield self._sse("tool_call", json.dumps({
+                    "tool_name": tool_name,
+                    "arguments": arguments,
+                }, ensure_ascii=False))
+
+                result_str = self.executor.execute(tool_name, arguments)
+                tool_records.append({
+                    "tool_name": tool_name,
+                    "arguments": arguments,
+                    "result": result_str[:500],
+                })
+                history.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result_str,
+                })
+
+        yield self._sse("error", "处理超时，请稍后重试")
+        yield self._sse("done", json.dumps({
+            "session_id": sid,
+            "tool_calls": tool_records,
+        }, ensure_ascii=False))
+
+    @staticmethod
+    def _sse(event: str, data: str) -> str:
+        """构建一条 Server-Sent Event 格式字符串"""
+        return f"event: {event}\ndata: {data}\n\n"

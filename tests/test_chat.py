@@ -288,9 +288,10 @@ class TestChatService:
 class TestChatAPI:
     def test_missing_api_key(self, api):
         """未配置 API Key 时返回 500"""
-        resp = api.post("/api/v1/chat/", json={"message": "你好"})
-        # OPENAI_API_KEY 默认为空（测试环境），端点会拒绝
-        assert resp.status_code == 500
+        import app.config
+        with patch.object(app.config.settings, "OPENAI_API_KEY", ""):
+            resp = api.post("/api/v1/chat/", json={"message": "你好"})
+            assert resp.status_code == 500
 
     def test_chat_success(self, api):
         """Mock ChatService 返回成功响应 — 模拟完整 tool call 流程"""
@@ -363,6 +364,105 @@ class TestSessionManagement:
         sid2, hist2 = _get_or_create_session(sid)
         assert sid2 == sid
         assert hist2 is hist  # 同一对象引用
+
+
+# ========== 5. Persona 角色系统测试 ==========
+
+class TestPersona:
+    def test_get_persona_prompt_buddy(self):
+        from app.services.chat_service import _get_persona_prompt
+        prompt = _get_persona_prompt("buddy")
+        assert "小账" in prompt
+        assert "回复风格" in prompt
+
+    def test_get_persona_prompt_cat(self):
+        from app.services.chat_service import _get_persona_prompt
+        prompt = _get_persona_prompt("cat")
+        assert "喵" in prompt
+        assert "回复风格" in prompt
+
+    def test_get_persona_prompt_empty(self):
+        from app.services.chat_service import _get_persona_prompt
+        assert _get_persona_prompt("") == ""
+        assert _get_persona_prompt(None) == ""
+
+    def test_get_persona_prompt_unknown_falls_back(self):
+        """不在预设中的 persona 值直接当作自定义 prompt 使用"""
+        from app.services.chat_service import _get_persona_prompt
+        prompt = _get_persona_prompt("unknown_key")
+        assert "回复风格" in prompt
+        assert "unknown_key" in prompt
+
+    def test_personas_module(self):
+        from app.services.personas import PERSONAS, get_persona
+        assert "buddy" in PERSONAS
+        assert "cat" in PERSONAS
+        assert "analyst" in PERSONAS
+        assert "homie" in PERSONAS
+        bp = get_persona("buddy")
+        assert "小账" in bp
+        cp = get_persona("cat")
+        assert "喵" in cp
+
+    def test_chat_service_with_persona_injects_into_history(self, db):
+        """persona=buddy 应该在 system prompt 中包含角色设定"""
+        seed_for_chat(db)
+        svc = ChatService(db)
+        svc.client = _make_mock_openai({"content": "老铁，这个月花得不多！"})
+        result = svc.chat("这个月花了多少", persona="buddy")
+        assert result["done"] is True
+        # system prompt 应该包含 persona 设定
+        sid = result["session_id"]
+        system_msg = _sessions[sid][0]["content"]
+        assert "回复风格" in system_msg or "小账" in system_msg
+
+
+# ========== 6. System Prompt 日期注入测试 ==========
+
+class TestSystemPrompt:
+    def test_contains_current_date(self):
+        from app.services.chat_service import _build_system_prompt
+        prompt = _build_system_prompt()
+        today = datetime.now()
+        assert str(today.year) in prompt
+        assert str(today.month) in prompt
+        assert "当前时间" in prompt
+        assert "本月" in prompt
+
+    def test_contains_persona_prompt(self):
+        from app.services.chat_service import _build_system_prompt
+        prompt = _build_system_prompt("我是毒舌搭子")
+        assert "我是毒舌搭子" in prompt
+
+
+# ========== 7. 流式端点测试 ==========
+
+class TestStreamEndpoint:
+    def test_stream_status_events(self, api):
+        """流式端点返回 SSE 事件流"""
+        import app.config
+        import app.api.v1.endpoints.chat as chat_module
+
+        def mock_stream(*args, **kwargs):
+            yield ChatService._sse("status", "测试中")
+            yield ChatService._sse("reply_chunk", "你好")
+            yield ChatService._sse("done", '{"session_id":"test"}')
+
+        mock_svc = MagicMock()
+        mock_svc.chat_stream = mock_stream
+
+        with patch.object(app.config.settings, "OPENAI_API_KEY", "sk-test"), \
+             patch.object(chat_module, "ChatService", return_value=mock_svc):
+            resp = api.post("/api/v1/chat/stream", json={"message": "你好"})
+            assert resp.status_code == 200
+            assert "text/event-stream" in resp.headers.get("content-type", "")
+
+    def test_chat_service_sse_helper(self):
+        """测试 _sse 静态方法"""
+        sse = ChatService._sse("test_event", "test_data")
+        assert "event: test_event" in sse
+        assert "data: test_data" in sse
+        assert sse.endswith("\n\n")
 
 
 if __name__ == "__main__":

@@ -8,6 +8,7 @@ class ChatRequest(BaseModel):
     """用户发送的聊天消息"""
     message: str = Field(..., description="用户输入的自然语言消息")
     session_id: Optional[str] = Field(None, description="会话 ID，用于多轮对话上下文")
+    persona: Optional[str] = Field(None, description="角色风格: buddy/cat/analyst/homie/custom，留空使用配置默认值")
 
 
 class ToolCallRecord(BaseModel):
