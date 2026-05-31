@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     PERSONA: str = os.getenv("PERSONA", "buddy")
     PERSONA_CUSTOM: str = os.getenv("PERSONA_CUSTOM", "")
 
+    # 会话保留天数（过期自动压缩上下文，保留 system prompt + 最近几轮）
+    CHAT_SESSION_TTL_DAYS: int = int(os.getenv("CHAT_SESSION_TTL_DAYS", "7"))
+    CHAT_KEEP_RECENT_ROUNDS: int = int(os.getenv("CHAT_KEEP_RECENT_ROUNDS", "5"))
+
     # 后续 RAG 相关配置预留
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     

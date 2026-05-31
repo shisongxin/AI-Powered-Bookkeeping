@@ -2,7 +2,6 @@
 """AI 对话服务 — LLM 对话循环 + 工具调用编排"""
 
 import json
-import uuid
 import logging
 from datetime import date, datetime
 from typing import Optional
@@ -15,24 +14,11 @@ from app.services.tool_definitions import TOOLS
 from app.services.bill_service import BillService
 from app.services.category_service import CategoryService
 from app.services.statistics_service import StatisticsService
+from app.services.chat_session_service import ChatSessionService
 from app.schemas.bill import BillCreate
 from app.schemas.statistics import MonthlySummary, CategoryBreakdownItem, TrendItem
 
 logger = logging.getLogger(__name__)
-
-
-# ---------- 会话存储（内存 dict，后续可迁移到 Redis/DB） ----------
-# key: session_id, value: list[dict]  # OpenAI 消息格式
-_sessions: dict[str, list[dict]] = {}
-
-
-def _get_or_create_session(session_id: Optional[str]) -> tuple[str, list[dict]]:
-    """获取已有会话或创建新会话，返回 (session_id, history)"""
-    if session_id and session_id in _sessions:
-        return session_id, _sessions[session_id]
-    new_id = session_id or uuid.uuid4().hex[:12]
-    _sessions[new_id] = []
-    return new_id, _sessions[new_id]
 
 
 # ---------- System Prompt ----------
@@ -223,6 +209,20 @@ class ToolExecutor:
         return json.dumps(result, ensure_ascii=False)
 
 
+# ---------- 辅助函数 ----------
+
+def _prune_history(history: list[dict], keep_recent: int = 10):
+    """修剪过长历史：保留 system prompt + 最近 keep_recent 轮对话"""
+    if len(history) <= keep_recent * 2 + 1:
+        return
+    # 保留 system prompt
+    system_msgs = [m for m in history if m.get("role") == "system"]
+    non_system = [m for m in history if m.get("role") != "system"]
+    # 从末尾保留最近几轮
+    recent = non_system[-keep_recent * 2:] if len(non_system) > keep_recent * 2 else non_system
+    history[:] = system_msgs + recent
+
+
 # ---------- Persona（角色预设） ----------
 
 def _get_persona_prompt(persona: str) -> str:
@@ -243,7 +243,7 @@ class ChatService:
 
     def __init__(self, db: Session):
         self.db = db
-        # 初始化 OpenAI 客户端（兼容任何 OpenAI API 格式的服务）
+        self.session_svc = ChatSessionService(db)
         self.client = OpenAI(
             api_key=settings.OPENAI_API_KEY or "sk-placeholder",
             base_url=settings.OPENAI_BASE_URL,
@@ -251,8 +251,8 @@ class ChatService:
         self.executor = ToolExecutor(db)
 
     def chat(self, message: str, session_id: Optional[str] = None, persona: str = "") -> dict:
-        """处理用户消息，返回包含回复和工具调用追踪的结果"""
-        sid, history = _get_or_create_session(session_id)
+        """处理用户消息，返回包含回复和工具调用追踪的结果。会话持久化到 DB，支持 TTL 压缩。"""
+        sid, history = self.session_svc.get_or_create(session_id)
 
         # 新会话：构建带当前日期的 system prompt
         if not history:
@@ -266,9 +266,11 @@ class ChatService:
         tool_records: list[dict] = []
         reply = self._run_conversation(history, tool_records)
 
-        # 清理过长的历史记录（保留 system + 最近 20 轮）
-        if len(history) > 22:  # system(1) + user+assistant(20)
-            history[1:-20] = []  # 删除中间的旧消息
+        # 清理过长历史（保留 system + 最近 10 轮，含本轮）
+        _prune_history(history, keep_recent=settings.CHAT_KEEP_RECENT_ROUNDS + 5)
+
+        # 持久化到数据库
+        self.session_svc.save(sid, history, persona)
 
         return {
             "reply": reply,
@@ -336,14 +338,14 @@ class ChatService:
         return "抱歉，处理您的请求时遇到了一些问题，请稍后重试。"
 
     def chat_stream(self, message: str, session_id: Optional[str] = None, persona: str = ""):
-        """流式对话：生成器逐条产出 SSE 格式字符串"""
-        sid, history = _get_or_create_session(session_id)
+        """流式对话：生成器逐条产出 SSE 格式字符串。会话持久化到 DB。"""
+        sid, history = self.session_svc.get_or_create(session_id)
         if not history:
             persona_prompt = _get_persona_prompt(persona)
             history.append({"role": "system", "content": _build_system_prompt(persona_prompt)})
         history.append({"role": "user", "content": message})
 
-        # Step 1: 工具选择阶段
+        # 工具选择阶段
         yield self._sse("status", "正在分析你的问题...")
         tool_records: list[dict] = []
 
@@ -374,6 +376,9 @@ class ChatService:
                         full_reply += delta.content
                         yield self._sse("reply_chunk", delta.content)
                 history.append({"role": "assistant", "content": full_reply})
+                # 修剪并持久化
+                _prune_history(history, keep_recent=settings.CHAT_KEEP_RECENT_ROUNDS + 5)
+                self.session_svc.save(sid, history, persona)
                 yield self._sse("done", json.dumps({
                     "session_id": sid,
                     "tool_calls": tool_records,

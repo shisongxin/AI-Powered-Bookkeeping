@@ -25,7 +25,8 @@ app/
 │   └── database.py            # 数据库引擎 & Session 管理
 ├── models/
 │   ├── bill.py                # Bill ORM 模型（bills 表）
-│   └── category.py            # Category ORM 模型（categories 表）
+│   ├── category.py            # Category ORM 模型（categories 表）
+│   └── chat_session.py        # ChatSession ORM 模型（会话持久化）
 ├── schemas/
 │   ├── bill.py                # Pydantic 模型（请求/响应 + 解析中间格式）
 │   ├── category.py            # Category Pydantic 模型
@@ -34,7 +35,8 @@ app/
 ├── services/
 │   ├── bill_service.py        # 账单业务逻辑（创建、导入、去重、自动分类）
 │   ├── category_service.py    # 分类业务逻辑（CRUD + 关键词自动匹配）
-│   ├── chat_service.py        # AI 对话编排（LLM 调用 + 工具执行 + 会话管理）
+│   ├── chat_service.py        # AI 对话编排（LLM 调用 + 工具执行）
+│   ├── chat_session_service.py # 会话持久化（DB 读写 + TTL 压缩）
 │   ├── tool_definitions.py    # 6 个工具的 OpenAI function calling 定义
 │   ├── personas.py            # 角色预设（4 种风格 + 自定义）
 │   └── statistics_service.py  # 统计业务逻辑（月度汇总、分类饼图、趋势）
@@ -55,7 +57,7 @@ tests/
 ├── test_parsers.py            # 解析器测试（3 个用例）
 ├── test_categories.py         # 分类系统测试（30 个用例）
 ├── test_statistics.py         # 统计 API 测试（12 个用例）
-└── test_chat.py               # AI 对话测试（28 个用例）
+└── test_chat.py               # AI 对话测试（31 个用例）
 init_db.py                     # 数据库初始化（Alembic 迁移 + 种子数据）
 requirements.txt               # Python 依赖
 ```
@@ -65,7 +67,7 @@ requirements.txt               # Python 依赖
 ### 1. 环境准备
 
 - Python 3.10+
-- PostgreSQL（默认连接 `postgres:697012@localhost:5432/bill_db`）
+- PostgreSQL（默认连接 `postgresql+psycopg2://postgres:YOUR_PASSWORD@localhost:5432/bill_db`）
 
 ### 2. 安装依赖
 
@@ -78,7 +80,7 @@ pip install -r requirements.txt
 编辑 `.env` 文件，按需修改数据库连接等配置：
 
 ```env
-DATABASE_URL=postgresql+psycopg2://postgres:697012@localhost:5432/bill_db
+DATABASE_URL=postgresql+psycopg2://postgres:YOUR_PASSWORD@localhost:5432/bill_db
 
 # LLM 配置（支持 OpenAI / 智谱 / DeepSeek / Ollama 等兼容服务）
 OPENAI_API_KEY=sk-your-key-here
@@ -111,7 +113,7 @@ uvicorn app.main:app --reload
 pytest tests/ -v
 ```
 
-当前 73 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设等全部功能。
+当前 76 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设、会话持久化等全部功能。
 
 ## 数据库迁移
 

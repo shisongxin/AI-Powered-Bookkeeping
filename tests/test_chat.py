@@ -8,7 +8,9 @@ from unittest.mock import patch, MagicMock
 
 from app.models.bill import Bill
 from app.models.category import Category
-from app.services.chat_service import ChatService, ToolExecutor, _sessions, _get_or_create_session
+from app.models.chat_session import ChatSession
+from app.services.chat_service import ChatService, ToolExecutor, _prune_history
+from app.services.chat_session_service import ChatSessionService
 from app.schemas.chat import ChatRequest, ChatResponse
 
 
@@ -333,12 +335,10 @@ class TestSessionManagement:
         assert len(result["session_id"]) == 12
 
     def test_session_reuse(self, db):
-        """多轮对话复用同一 session_id"""
+        """多轮对话复用同一 session_id，且持久化到 DB"""
         seed_for_chat(db)
         svc = ChatService(db)
-        svc.client = _make_mock_openai(
-            {"content": "已记录。"},
-        )
+        svc.client = _make_mock_openai({"content": "已记录。"})
 
         result1 = svc.chat("午餐35元")
         sid = result1["session_id"]
@@ -346,24 +346,88 @@ class TestSessionManagement:
         result2 = svc.chat("晚餐80元", session_id=sid)
         assert result2["session_id"] == sid
 
-        # 验证历史记录中有 2 轮 user+assistant
-        assert sid in _sessions
-        history = _sessions[sid]
-        user_msgs = [m for m in history if m["role"] == "user"]
+        # 验证 DB 中有该会话
+        session = db.query(ChatSession).filter(ChatSession.session_key == sid).first()
+        assert session is not None
+        # 验证 history 包含 2 轮 user 消息
+        user_msgs = [m for m in session.messages if m.get("role") == "user"]
         assert len(user_msgs) == 2
 
-    def test_standalone_session_helper(self):
-        """测试 _get_or_create_session 辅助函数"""
-        # 清除可能残留的会话
-        _sessions.clear()
+    def test_session_persisted_across_instances(self, db):
+        """不同 ChatService 实例使用同一 session_id 能恢复上下文"""
+        seed_for_chat(db)
+        # 第一个实例创建会话
+        svc1 = ChatService(db)
+        svc1.client = _make_mock_openai({"content": "你好！"})
+        result1 = svc1.chat("你好")
+        sid = result1["session_id"]
 
-        sid, hist = _get_or_create_session(None)
-        assert len(sid) == 12
+        # 第二个实例使用同一 session_id
+        svc2 = ChatService(db)
+        svc2.client = _make_mock_openai({"content": "这是第二轮的回复"})
+        result2 = svc2.chat("继续", session_id=sid)
+        assert result2["session_id"] == sid
+
+    def test_session_service_get_or_create(self, db):
+        """ChatSessionService 基本 CRUD 操作"""
+        svc = ChatSessionService(db)
+
+        # 创建新会话
+        key, hist = svc.get_or_create(None)
+        assert len(key) == 12
         assert hist == []
 
-        sid2, hist2 = _get_or_create_session(sid)
-        assert sid2 == sid
-        assert hist2 is hist  # 同一对象引用
+        # 再次获取同一会话
+        key2, hist2 = svc.get_or_create(key)
+        assert key2 == key
+        assert hist2 == hist
+
+        # 保存消息
+        svc.save(key, [{"role": "system", "content": "test"}])
+        _, loaded = svc.get_or_create(key)
+        assert len(loaded) == 1
+        assert loaded[0]["role"] == "system"
+
+    def test_ttl_compress(self, db, monkeypatch):
+        """会话超过 TTL 天数后自动压缩历史"""
+        from datetime import timedelta
+        seed_for_chat(db)
+
+        # 设置较短 TTL 以便测试
+        monkeypatch.setattr("app.services.chat_session_service.settings.CHAT_SESSION_TTL_DAYS", 0)
+        monkeypatch.setattr("app.services.chat_session_service.settings.CHAT_KEEP_RECENT_ROUNDS", 2)
+
+        chat_svc = ChatSessionService(db)
+        key, _ = chat_svc.get_or_create()
+
+        # 构造多轮对话历史（8 轮 = 16 条 user+assistant 消息 + 1 system）
+        messages = [{"role": "system", "content": "System prompt"}]
+        for i in range(8):
+            messages.append({"role": "user", "content": f"用户消息{i}"})
+            messages.append({"role": "assistant", "content": f"助手回复{i}"})
+
+        chat_svc.save(key, messages)
+
+        # 重新加载——TTL=0 触发压缩，只保留 system + 最近 2 轮
+        _, loaded = chat_svc.get_or_create(key)
+        assert len(loaded) < len(messages), f"压缩后应少于原始消息数: {len(loaded)} vs {len(messages)}"
+        assert loaded[0]["role"] == "system"  # system prompt 还在
+        user_msgs = [m for m in loaded if m.get("role") == "user"]
+        assert len(user_msgs) <= 2  # 只保留最近 2 轮
+
+    def test_prune_history_helper(self):
+        """_prune_history 辅助函数修剪对话历史"""
+        messages = [{"role": "system", "content": "System prompt"}]
+        for i in range(15):
+            messages.append({"role": "user", "content": f"u{i}"})
+            messages.append({"role": "assistant", "content": f"a{i}"})
+
+        _prune_history(messages, keep_recent=3)
+        assert messages[0]["role"] == "system"
+        user_msgs = [m for m in messages if m.get("role") == "user"]
+        assert len(user_msgs) <= 3
+        # 最后一条 user 消息应该是 u14
+        assert user_msgs[-1]["content"] == "u14"
 
 
 # ========== 5. Persona 角色系统测试 ==========
@@ -411,9 +475,11 @@ class TestPersona:
         svc.client = _make_mock_openai({"content": "老铁，这个月花得不多！"})
         result = svc.chat("这个月花了多少", persona="buddy")
         assert result["done"] is True
-        # system prompt 应该包含 persona 设定
+        # 从 DB 查询验证 system prompt 包含 persona 设定
         sid = result["session_id"]
-        system_msg = _sessions[sid][0]["content"]
+        session = db.query(ChatSession).filter(ChatSession.session_key == sid).first()
+        assert session is not None
+        system_msg = session.messages[0]["content"]
         assert "回复风格" in system_msg or "小账" in system_msg
 
 
