@@ -12,16 +12,16 @@ class Settings(BaseSettings):
     DEBUG: bool = True # 开发环境设为True
     API_V1_PREFIX: str = "/api/v1"
     
-    # 数据库配置 - 同步版本
+    # 数据库配置 - 同步版本（请在 .env 中设置实际连接字符串）
     DATABASE_URL: str = os.getenv(
-        "DATABASE_URL", 
-        "postgresql+psycopg2://postgres:697012@localhost:5432/bill_db"
+        "DATABASE_URL",
+        "sqlite:///./billagent.db",  # 安全 fallback，生产环境请通过 .env 覆盖为 PostgreSQL
     )
-    
-    # LLM 配置（OpenAI 兼容接口，可切换 Ollama / LM Studio / 国产模型智谱）
-    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "19d299b045ee418e823d04b10b8be8c7.xblqgSBjzZAfMdgi")
-    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://open.bigmodel.cn/api/paas/v4")
-    LLM_MODEL: str = os.getenv("LLM_MODEL", "glm-5.1")
+
+    # LLM 配置（OpenAI 兼容接口，支持 OpenAI / 智谱 / DeepSeek / Ollama 等）
+    OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     LLM_MAX_TOKENS: int = 1024
     LLM_TEMPERATURE: float = 0.7
 

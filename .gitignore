@@ -1,5 +1,12 @@
-*.env
+.env
+*.db
+_test.db
 __pycache__/
 *.pyc
 *.log
-*.DS_Store
+.DS_Store
+.venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
