@@ -16,7 +16,7 @@ OCR_SYSTEM_PROMPT = """你是一个高精度的账单/收据图像 OCR 结构化
 请仔细扫描图片（包含微信支付、支付宝等聊天流或账单详情截图），并提取所有可见的独立交易记录。
 
 【核心推理规则】
-1. 完整的日期推理：图片中往往只显示当天的时间（如 "11:46"、"17:04"）。请结合用户提供的[当前系统时间]，推导出每笔交易最合理的实际发生日期（格式必须为 YYYY-MM-DD）。
+1. 完整的日期推理：图片中若只显示当天的时间（如 "11:46"、"17:04"）。请结合用户提供的[当前系统时间]，推导出每笔交易最合理的实际发生日期（格式必须为 YYYY-MM-DD）。
 2. 多笔交易拆分：若图片中按时间流展现了多张卡片或多笔扣款（例如多个不同的商户、不同的金额），必须将其解析为 `items` 列表中的多个独立对象，绝对不能合并。
 3. 收支符号：支出金额在 JSON 中必须记录为【负数】（如 -16.0），收入记录为【正数】（如 500.0）。
 4. 字段规范：`payee` 提取完整的商户全称（如 "上海田律餐饮管理有限公司"），`category` 根据商户名智能归类到（餐饮/交通/购物/娱乐/医疗/居住/其他）。
@@ -49,13 +49,16 @@ class OCRService:
             base_url=settings.OPENAI_BASE_URL,
         )
 
-    def recognize(self, image_base64: str, content_type: str = "image/jpeg") -> OCRResponse:
-        """将 base64 图片发送到 vision LLM，返回结构化 OCR 结果"""
+    def recognize(self, image_base64: str, content_type: str = "image/jpeg",
+                  current_time_str: str = "") -> OCRResponse:
+        """将 base64 图片发送到 vision LLM，返回结构化 OCR 结果。
+        current_time_str 由 ChatService 统一时间锚点传入；为空时自动获取当前时间。
+        """
         logger.info(f"开始 OCR 识别，图片大小: {len(image_base64)} bytes (base64)")
 
-        # 获取当前系统时间，注入给大模型作为时间锚点（例如：2026-06-01）
-        current_time_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        user_prompt = f"请提取这张账单/收据中的所有交易信息。当前系统参考时间是: {current_time_str}"
+        # 使用外部传入的统一时间锚点，或回退到当前系统时间
+        time_ref = current_time_str or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        user_prompt = f"请提取这张账单/收据中的所有交易信息。当前系统参考时间是: {time_ref}"
 
         # 构建 vision API 请求
         response = self.client.chat.completions.create(

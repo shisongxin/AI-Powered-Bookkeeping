@@ -9,6 +9,8 @@ class ChatRequest(BaseModel):
     message: str = Field(..., description="用户输入的自然语言消息")
     session_id: Optional[str] = Field(None, description="会话 ID，用于多轮对话上下文")
     persona: Optional[str] = Field(None, description="角色风格: buddy/cat/analyst/homie/custom，留空使用配置默认值")
+    image_base64: Optional[str] = Field(None, description="账单截图的 base64 编码（用于 OCR 识别记账）")
+    image_content_type: Optional[str] = Field("image/jpeg", description="图片 MIME 类型")
 
 
 class ToolCallRecord(BaseModel):

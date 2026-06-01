@@ -170,13 +170,13 @@ TOOLS: list[dict] = [
         "type": "function",
         "function": {
             "name": "scan_receipt",
-            "description": "引导用户上传账单截图或收据照片进行 OCR 识别。当用户想通过拍照记账时，建议他们使用 /ocr/recognize 端点上传图片。此工具返回识别结果中可确认的交易列表。",
+            "description": "对用户上传的账单截图/收据照片进行 OCR 识别，提取结构化交易数据（日期、金额、商户、分类等）。识别成功后，应继续调用 create_bill 逐条将提取到的交易记录入库。这是拍照记账的核心工具。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "description": {
                         "type": "string",
-                        "description": "用户描述的账单图片内容（如 午餐收据、超市小票）",
+                        "description": "用户对图片内容的简短描述（如 微信支付账单截图、午餐收据），用于日志记录",
                     },
                 },
             },

@@ -27,7 +27,11 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
     _check_api_key()
     from app.config import settings
     try:
-        svc = ChatService(db)
+        svc = ChatService(
+            db,
+            image_base64=request.image_base64 or "",
+            image_content_type=request.image_content_type or "image/jpeg",
+        )
         persona = request.persona or settings.PERSONA or ""
         result = svc.chat(request.message, request.session_id, persona)
         return ChatResponse(**result)
@@ -40,7 +44,11 @@ def chat_stream(request: ChatRequest, db: Session = Depends(get_db)):
     """流式对话（SSE），逐 token 推送回复，推送工具调用进度"""
     _check_api_key()
     from app.config import settings
-    svc = ChatService(db)
+    svc = ChatService(
+        db,
+        image_base64=request.image_base64 or "",
+        image_content_type=request.image_content_type or "image/jpeg",
+    )
     persona = request.persona or settings.PERSONA or ""
     return StreamingResponse(
         svc.chat_stream(request.message, request.session_id, persona),

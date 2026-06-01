@@ -23,9 +23,17 @@ logger = logging.getLogger(__name__)
 
 # ---------- System Prompt ----------
 
-def _build_system_prompt(persona_prompt: str = "") -> str:
-    """构建 system prompt，动态注入当前日期和可选的 persona 设定"""
+def _build_system_prompt(persona_prompt: str = "", time_str: Optional[str] = None) -> str:
+    """构建 system prompt，注入统一时间锚点和可选 persona 设定。
+    time_str 由 ChatService 入口锁定，确保 LLM+OCR 使用同一时间基准。
+    """
     now = datetime.now()
+    if time_str:
+        try:
+            now = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            pass  # 格式异常时 fallback 到当前时间
+
     weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
     today_str = now.strftime("%Y-%m-%d")
     weekday = weekday_names[now.weekday()]
@@ -39,6 +47,7 @@ def _build_system_prompt(persona_prompt: str = "") -> str:
 - 金额: 支出负数、收入正数。日期: YYYY-MM-DD
 - 用户说"今天/本月"等词时，用上方当前时间推算具体日期
 - 记账前不确定分类名时先调 list_categories
+- 收到账单截图时，先调 scan_receipt 提取交易，再逐条调 create_bill 入库
 - 回复简短、口语化，金额带"元"
 {persona_prompt}"""
     return base
@@ -47,10 +56,16 @@ def _build_system_prompt(persona_prompt: str = "") -> str:
 # ---------- Tool 执行器 ----------
 
 class ToolExecutor:
-    """将 LLM 请求的工具名称和参数路由到实际的服务方法"""
+    """将 LLM 请求的工具名称和参数路由到实际的服务方法。
+    通过构造函数注入统一时间锚点和图片数据，OCR 与 LLM 使用同一时间基准。
+    """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, current_time_str: str = "",
+                 image_base64: str = "", image_content_type: str = "image/jpeg"):
         self.db = db
+        self.current_time_str = current_time_str or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.image_base64 = image_base64
+        self.image_content_type = image_content_type
 
     def execute(self, tool_name: str, arguments: dict) -> str:
         """执行工具调用，返回 JSON 字符串结果"""
@@ -68,6 +83,8 @@ class ToolExecutor:
                 return self._get_trend(arguments)
             elif tool_name == "list_categories":
                 return self._list_categories()
+            elif tool_name == "scan_receipt":
+                return self._scan_receipt(arguments)
             else:
                 return json.dumps({"error": f"未知工具: {tool_name}"}, ensure_ascii=False)
         except Exception as e:
@@ -208,6 +225,26 @@ class ToolExecutor:
         ]
         return json.dumps(result, ensure_ascii=False)
 
+    def _scan_receipt(self, args: dict) -> str:
+        """调用 OCRService 识别账单截图，使用 ChatService 的统一时间锚点"""
+        # 优先使用 args 中传入的 image，其次使用 ChatService 构造时注入的
+        image_b64 = args.get("image_base64") or self.image_base64
+        image_type = args.get("image_content_type") or self.image_content_type
+        if not image_b64:
+            return json.dumps({
+                "success": False,
+                "message": "未提供图片数据，请通过 /ocr/recognize 端点上传或附带 image_base64 参数",
+            }, ensure_ascii=False)
+
+        from app.services.ocr_service import OCRService
+        ocr = OCRService()
+        # 传入统一时间锚点，保证 OCR 的日期推理与 LLM System Prompt 一致
+        result = ocr.recognize(image_b64, image_type, current_time_str=self.current_time_str)
+
+        result_dict = result.model_dump()
+        result_dict["time_anchor"] = self.current_time_str
+        return json.dumps(result_dict, ensure_ascii=False)
+
 
 # ---------- 辅助函数 ----------
 
@@ -239,30 +276,59 @@ def _get_persona_prompt(persona: str) -> str:
 # ---------- ChatService ----------
 
 class ChatService:
-    """AI 对话服务：编排 LLM 调用和工具执行，管理会话历史"""
+    """AI 对话服务：编排 LLM 调用和工具执行，管理会话历史。
+    在入口处锁定统一时间锚点，保证 LLM 和 OCR 使用同一时间基准。
+    """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, image_base64: str = "", image_content_type: str = "image/jpeg"):
         self.db = db
         self.session_svc = ChatSessionService(db)
         self.client = OpenAI(
             api_key=settings.OPENAI_API_KEY or "sk-placeholder",
             base_url=settings.OPENAI_BASE_URL,
         )
-        self.executor = ToolExecutor(db)
+        # 统一时间锚点：入口处锁定，整个对话链复用
+        self._time_anchor = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 图片数据（来自 ChatRequest），供 ToolExecutor 的 scan_receipt 使用
+        self._image_b64 = image_base64
+        self._image_type = image_content_type
+        # 延迟初始化 executor（在 chat/chat_stream 中创建，确保时间锚点已就绪）
+        self.executor: Optional[ToolExecutor] = None
+
+    def _get_executor(self) -> ToolExecutor:
+        if self.executor is None:
+            self.executor = ToolExecutor(
+                self.db, self._time_anchor, self._image_b64, self._image_type
+            )
+        return self.executor
+
+    def _build_user_content(self, message: str):
+        """构建发给 LLM 的用户消息内容。
+        如果有图片，使用 vision 格式（image + text）；否则纯文本。
+        """
+        if self._image_b64:
+            return [
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{self._image_type};base64,{self._image_b64}"},
+                },
+                {"type": "text", "text": message or "请识别这张账单截图中的所有交易记录，并帮我记账"},
+            ]
+        return message
 
     def chat(self, message: str, session_id: Optional[str] = None, persona: str = "") -> dict:
         """处理用户消息，返回包含回复和工具调用追踪的结果。会话持久化到 DB，支持 TTL 压缩。"""
         sid, history = self.session_svc.get_or_create(session_id)
 
-        # 新会话：构建带当前日期的 system prompt
+        # 新会话：构建带统一时间锚点的 system prompt
         if not history:
             persona_prompt = _get_persona_prompt(persona)
-            history.append({"role": "system", "content": _build_system_prompt(persona_prompt)})
+            history.append({"role": "system", "content": _build_system_prompt(persona_prompt, self._time_anchor)})
 
-        # 添加用户消息
-        history.append({"role": "user", "content": message})
+        # 添加用户消息（支持图片）
+        history.append({"role": "user", "content": self._build_user_content(message)})
 
-        # 调用 LLM（可能产生多轮 tool call）
+        # 调用 LLM（可能产生多轮 tool call，包括 scan_receipt → create_bill 联动）
         tool_records: list[dict] = []
         reply = self._run_conversation(history, tool_records)
 
@@ -323,7 +389,7 @@ class ChatService:
             for tc in msg.tool_calls:
                 tool_name = tc.function.name
                 arguments = json.loads(tc.function.arguments)
-                result_str = self.executor.execute(tool_name, arguments)
+                result_str = self._get_executor().execute(tool_name, arguments)
                 tool_records.append({
                     "tool_name": tool_name,
                     "arguments": arguments,
@@ -342,8 +408,8 @@ class ChatService:
         sid, history = self.session_svc.get_or_create(session_id)
         if not history:
             persona_prompt = _get_persona_prompt(persona)
-            history.append({"role": "system", "content": _build_system_prompt(persona_prompt)})
-        history.append({"role": "user", "content": message})
+            history.append({"role": "system", "content": _build_system_prompt(persona_prompt, self._time_anchor)})
+        history.append({"role": "user", "content": self._build_user_content(message)})
 
         # 工具选择阶段
         yield self._sse("status", "正在分析你的问题...")
@@ -410,7 +476,7 @@ class ChatService:
                     "arguments": arguments,
                 }, ensure_ascii=False))
 
-                result_str = self.executor.execute(tool_name, arguments)
+                result_str = self._get_executor().execute(tool_name, arguments)
                 tool_records.append({
                     "tool_name": tool_name,
                     "arguments": arguments,
