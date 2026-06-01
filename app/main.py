@@ -2,7 +2,7 @@
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.api.v1.endpoints import bills, categories, chat, statistics
+from app.api.v1.endpoints import bills, categories, chat, statistics, auth
 from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -48,6 +48,7 @@ app.include_router(bills.router, prefix=settings.API_V1_PREFIX)
 app.include_router(categories.router, prefix=settings.API_V1_PREFIX)
 app.include_router(chat.router, prefix=settings.API_V1_PREFIX)
 app.include_router(statistics.router, prefix=settings.API_V1_PREFIX)
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

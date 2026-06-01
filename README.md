@@ -1,6 +1,6 @@
 # BillAgent — AI-Powered Bookkeeping
 
-智能记账助手，支持多格式账单文件导入、自动分类、统计分析、AI 对话、消费分析和预算规划功能。
+智能记账助手APP，支持多格式账单文件导入、自动分类、统计分析、AI 对话、消费分析和预算规划功能。
 
 ## 技术栈
 
@@ -22,12 +22,16 @@ app/
 ├── main.py                    # FastAPI 应用入口
 ├── config.py                  # 配置管理（环境变量）
 ├── core/
-│   └── database.py            # 数据库引擎 & Session 管理
+│   ├── database.py            # 数据库引擎 & Session 管理
+│   ├── auth.py                # 密码哈希 (bcrypt) + JWT 签发/验证
+│   └── dependencies.py        # FastAPI 依赖注入 (get_current_user)
 ├── models/
 │   ├── bill.py                # Bill ORM 模型（bills 表）
 │   ├── category.py            # Category ORM 模型（categories 表）
-│   └── chat_session.py        # ChatSession ORM 模型（会话持久化）
+│   ├── chat_session.py        # ChatSession ORM 模型（会话持久化）
+│   └── user.py                # User ORM 模型（用户认证）
 ├── schemas/
+│   ├── auth.py                # 认证 Pydantic 模型（注册/登录/Token/用户信息）
 │   ├── bill.py                # Pydantic 模型（请求/响应 + 解析中间格式）
 │   ├── category.py            # Category Pydantic 模型
 │   ├── chat.py                # Chat 请求/响应模型
@@ -41,6 +45,7 @@ app/
 │   ├── personas.py            # 角色预设（4 种风格 + 自定义）
 │   └── statistics_service.py  # 统计业务逻辑（月度汇总、分类饼图、趋势）
 ├── api/v1/endpoints/
+│   ├── auth.py                # 认证端点（注册/登录/个人信息）
 │   ├── bills.py               # 账单 CRUD + 文件上传解析
 │   ├── categories.py          # 分类 CRUD + 自动匹配
 │   ├── statistics.py          # 统计查询（月度汇总/分类饼图/消费趋势）
@@ -57,7 +62,8 @@ tests/
 ├── test_parsers.py            # 解析器测试（3 个用例）
 ├── test_categories.py         # 分类系统测试（30 个用例）
 ├── test_statistics.py         # 统计 API 测试（12 个用例）
-└── test_chat.py               # AI 对话测试（31 个用例）
+├── test_chat.py               # AI 对话测试（31 个用例）
+└── test_auth.py               # 认证测试（13 个用例）
 init_db.py                     # 数据库初始化（Alembic 迁移 + 种子数据）
 requirements.txt               # Python 依赖
 ```
@@ -113,7 +119,7 @@ uvicorn app.main:app --reload
 pytest tests/ -v
 ```
 
-当前 76 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设、会话持久化等全部功能。
+当前 89 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设、会话持久化、用户认证等全部功能。
 
 ## 数据库迁移
 
@@ -219,6 +225,9 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | GET | `/api/v1/statistics/trend` | 消费趋势 |
 | POST | `/api/v1/chat/` | AI 对话（非流式） |
 | POST | `/api/v1/chat/stream` | AI 对话（SSE 流式 + 工具进度） |
+| POST | `/api/v1/auth/register` | 用户注册 |
+| POST | `/api/v1/auth/login` | 用户登录 |
+| GET | `/api/v1/auth/me` | 获取当前用户信息 |
 
 ## 默认分类
 
@@ -234,6 +243,32 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | 通讯 | 手机, 话费, 流量, 充值 |
 | 收入 | 工资, 奖金, 红包, 退款, 报销 |
 | 其他 | （无关键词，作为兜底分类） |
+
+### 用户认证系统
+
+支持 JWT 用户注册/登录，为多用户数据隔离打下基础。当前端点无需认证即可使用（向后兼容）。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/auth/register` | 注册新用户，返回 JWT token |
+| POST | `/api/v1/auth/login` | 用户登录，返回 JWT token |
+| GET | `/api/v1/auth/me` | 获取当前用户信息（需 Authorization 头） |
+
+```bash
+# 注册
+curl -X POST "http://localhost:8000/api/v1/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"demo","password":"secret123"}'
+
+# 登录
+curl -X POST "http://localhost:8000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"username":"demo","password":"secret123"}'
+
+# 获取个人信息
+curl "http://localhost:8000/api/v1/auth/me" \
+  -H "Authorization: Bearer <token>"
+```
 
 ## AI 对话记账
 

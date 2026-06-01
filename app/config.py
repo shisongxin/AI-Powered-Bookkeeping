@@ -1,5 +1,6 @@
 # app/config.py
 import os
+import secrets
 from pydantic_settings import BaseSettings
 from dotenv import load_dotenv
 
@@ -9,9 +10,9 @@ load_dotenv()
 class Settings(BaseSettings):
     # 应用基础配置
     APP_NAME: str = "BillAgent"
-    DEBUG: bool = True # 开发环境设为True
+    DEBUG: bool = True  # 开发环境设为True
     API_V1_PREFIX: str = "/api/v1"
-    
+
     # 数据库配置 - 同步版本（请在 .env 中设置实际连接字符串）
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL",
@@ -33,9 +34,14 @@ class Settings(BaseSettings):
     CHAT_SESSION_TTL_DAYS: int = int(os.getenv("CHAT_SESSION_TTL_DAYS", "7"))
     CHAT_KEEP_RECENT_ROUNDS: int = int(os.getenv("CHAT_KEEP_RECENT_ROUNDS", "5"))
 
+    # JWT 认证配置（未配置 JWT_SECRET 时自动生成随机密钥，生产环境请显式设置）
+    JWT_SECRET: str = os.getenv("JWT_SECRET", secrets.token_hex(32))
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", str(60 * 24 * 7)))  # 默认7天
+
     # 后续 RAG 相关配置预留
     EMBEDDING_MODEL: str = "text-embedding-3-small"
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = True
