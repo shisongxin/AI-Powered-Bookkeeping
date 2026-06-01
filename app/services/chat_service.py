@@ -61,11 +61,13 @@ class ToolExecutor:
     """
 
     def __init__(self, db: Session, current_time_str: str = "",
-                 image_base64: str = "", image_content_type: str = "image/jpeg"):
+                 image_base64: str = "", image_content_type: str = "image/jpeg",
+                 openai_client: Optional[OpenAI] = None):
         self.db = db
         self.current_time_str = current_time_str or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.image_base64 = image_base64
         self.image_content_type = image_content_type
+        self.llm_client = openai_client  # 复用 ChatService 的 OpenAI 连接
 
     def execute(self, tool_name: str, arguments: dict) -> str:
         """执行工具调用，返回 JSON 字符串结果"""
@@ -83,6 +85,10 @@ class ToolExecutor:
                 return self._get_trend(arguments)
             elif tool_name == "list_categories":
                 return self._list_categories()
+            elif tool_name == "get_budget_status":
+                return self._get_budget_status(arguments)
+            elif tool_name == "suggest_budget":
+                return self._suggest_budget(arguments)
             elif tool_name == "scan_receipt":
                 return self._scan_receipt(arguments)
             else:
@@ -225,6 +231,22 @@ class ToolExecutor:
         ]
         return json.dumps(result, ensure_ascii=False)
 
+    def _get_budget_status(self, args: dict) -> str:
+        """获取预算 vs 实际对比"""
+        from app.services.budget_service import BudgetService
+        svc = BudgetService(self.db)
+        result = svc.vs_actual(int(args["year"]), int(args["month"]))
+        return json.dumps(result.model_dump(), ensure_ascii=False)
+
+    def _suggest_budget(self, args: dict) -> str:
+        """AI 预算建议 — 复用 ChatService 的 OpenAI 客户端"""
+        from app.services.budget_service import BudgetService
+        svc = BudgetService(self.db)
+        suggestions = svc.suggest_budget(
+            int(args["year"]), int(args["month"]), client=self.llm_client
+        )
+        return json.dumps([s.model_dump() for s in suggestions], ensure_ascii=False)
+
     def _scan_receipt(self, args: dict) -> str:
         """调用 OCRService 识别账单截图，使用 ChatService 的统一时间锚点"""
         # 优先使用 args 中传入的 image，其次使用 ChatService 构造时注入的
@@ -298,7 +320,8 @@ class ChatService:
     def _get_executor(self) -> ToolExecutor:
         if self.executor is None:
             self.executor = ToolExecutor(
-                self.db, self._time_anchor, self._image_b64, self._image_type
+                self.db, self._time_anchor, self._image_b64, self._image_type,
+                openai_client=self.client,
             )
         return self.executor
 

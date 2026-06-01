@@ -124,7 +124,7 @@ uvicorn app.main:app --reload
 pytest tests/ -v
 ```
 
-当前 99 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设、会话持久化、用户认证、OCR 图片识别等全部功能。
+当前 119 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设、会话持久化、用户认证、OCR 图片识别、月度预算等全部功能。
 
 ## 数据库迁移
 
@@ -234,6 +234,12 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | POST | `/api/v1/auth/login` | 用户登录 |
 | GET | `/api/v1/auth/me` | 获取当前用户信息 |
 | POST | `/api/v1/ocr/recognize` | OCR 图片识别（上传截图提取交易） |
+| POST | `/api/v1/budgets/` | 创建/覆盖预算 |
+| GET | `/api/v1/budgets/?year=&month=` | 查询月度预算 |
+| PUT | `/api/v1/budgets/{id}` | 更新预算 |
+| DELETE | `/api/v1/budgets/{id}` | 删除预算 |
+| GET | `/api/v1/budgets/vs-actual?year=&month=` | 预算 vs 实际对比 |
+| GET | `/api/v1/budgets/suggest?year=&month=` | AI 预算建议 |
 
 ## 默认分类
 
@@ -298,6 +304,46 @@ VISION_MODEL=glm-4v        # 智谱 GLM-4V（默认，推荐中文场景）
 ```
 
 支持的图片格式：PNG / JPG / WebP，最大 10MB，自动压缩大图。
+
+**Chat 集成**：通过 ChatRequest 的 `image_base64` 字段，可直接在对话中上传图片，LLM 自动完成"OCR 识别 → 逐条记账"全链路（Tool Chaining）：
+```bash
+curl -X POST "http://localhost:8000/api/v1/chat/" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"识别并记账","image_base64":"...","persona":"buddy"}'
+# → scan_receipt → create_bill × N → 自然语言回复
+```
+
+**统一时间锚点**：ChatService 入口锁定系统时间，传递给 System Prompt + OCRService，确保 LLM 日期推理与 OCR 使用同一时间基准，杜绝重复 `datetime.now()` 调用。
+
+### 月度预算规划
+
+设置月度分类预算，实时对比实际支出，AI 基于历史数据生成建议。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/budgets/` | 创建/覆盖预算（同年月+分类唯一） |
+| GET | `/api/v1/budgets/?year=&month=` | 查询月度预算列表 |
+| PUT | `/api/v1/budgets/{id}` | 更新预算金额或备注 |
+| DELETE | `/api/v1/budgets/{id}` | 删除预算 |
+| GET | `/api/v1/budgets/vs-actual?year=&month=` | 预算 vs 实际对比（含状态） |
+| GET | `/api/v1/budgets/suggest?year=&month=` | AI 预算建议（近3月历史） |
+
+**消耗状态**：`正常`(<80%) → `接近上限`(80-100%) → `已超支`(>100%) → `无预算`
+
+```bash
+# 设置预算
+curl -X POST "http://localhost:8000/api/v1/budgets/" \
+  -H "Content-Type: application/json" \
+  -d '{"year":2026,"month":6,"category":"餐饮","amount":3000}'
+
+# 预算 vs 实际
+curl "http://localhost:8000/api/v1/budgets/vs-actual?year=2026&month=6"
+# → {"items":[{"category":"餐饮","budget":3000,"actual":450,"remaining":2550,"percentage":15.0,"status":"正常"}],...}
+
+# AI 建议
+curl "http://localhost:8000/api/v1/budgets/suggest?year=2026&month=7"
+# → [{"category":"餐饮","suggested_amount":3300.0,"reason":"月均3000，上浮10%缓冲"},...]
+```
 
 ## AI 对话记账
 
@@ -371,6 +417,9 @@ curl -X POST "http://localhost:8000/api/v1/chat/" \
 | `get_category_breakdown` | "餐饮占比多少"、"各分类分布" |
 | `get_trend` | "最近6个月的趋势"、"这周每天开销" |
 | `list_categories` | "有哪些分类"、"可用的分类" |
+| `scan_receipt` | 收到账单截图后自动调用，提取交易再逐条 create_bill |
+| `get_budget_status` | "预算还剩多少"、"哪个分类超支了" |
+| `suggest_budget` | "下个月预算设多少合适" |
 
 ### 速度优化
 
@@ -383,4 +432,4 @@ curl -X POST "http://localhost:8000/api/v1/chat/" \
 - [x] **AI 记账对话** — LLM Function Calling + 流式输出 + Persona 角色系统
 - [ ] **OCR 图片识别** — 上传账单截图自动识别交易信息
 - [ ] **语音记账** — 语音输入转文字后自动生成账单记录
-- [ ] **月度预算规划** — 基于历史消费数据 AI 生成下月预算建议
+- [x] **月度预算规划** — 预算 CRUD + vs-actual 对比 + AI 预算建议

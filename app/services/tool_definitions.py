@@ -182,6 +182,36 @@ TOOLS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_budget_status",
+            "description": "获取指定月份的预算 vs 实际支出对比。返回每个分类的预算、实际支出、剩余额度、消耗百分比和状态（正常/接近上限/已超支/无预算）。适合回答 预算还剩多少、哪个分类超支了 这类问题。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "year": {"type": "integer", "description": "年份，如 2026"},
+                    "month": {"type": "integer", "description": "月份，1-12"},
+                },
+                "required": ["year", "month"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "suggest_budget",
+            "description": "基于近3个月历史消费数据，由 AI 生成下月预算建议。返回每个分类的建议预算金额和简短理由。适合回答 下个月预算设多少合适 这类问题。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "year": {"type": "integer", "description": "目标年份"},
+                    "month": {"type": "integer", "description": "目标月份"},
+                },
+                "required": ["year", "month"],
+            },
+        },
+    },
 ]
 
 # 工具名称到简短描述的映射，用于构建 system prompt
