@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
     LLM_MAX_TOKENS: int = 1024
     LLM_TEMPERATURE: float = 0.7
+    # 多模态模型（用于 OCR 图片识别，需支持 vision）
+    VISION_MODEL: str = os.getenv("VISION_MODEL", "glm-4v")
 
     # 角色预设（buddy/cat/analyst/homie/custom）
     PERSONA: str = os.getenv("PERSONA", "buddy")

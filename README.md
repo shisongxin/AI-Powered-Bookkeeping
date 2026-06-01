@@ -35,13 +35,15 @@ app/
 │   ├── bill.py                # Pydantic 模型（请求/响应 + 解析中间格式）
 │   ├── category.py            # Category Pydantic 模型
 │   ├── chat.py                # Chat 请求/响应模型
+│   ├── ocr.py                 # OCR 识别响应模型
 │   └── statistics.py          # 统计查询响应模型
 ├── services/
 │   ├── bill_service.py        # 账单业务逻辑（创建、导入、去重、自动分类）
 │   ├── category_service.py    # 分类业务逻辑（CRUD + 关键词自动匹配）
 │   ├── chat_service.py        # AI 对话编排（LLM 调用 + 工具执行）
 │   ├── chat_session_service.py # 会话持久化（DB 读写 + TTL 压缩）
-│   ├── tool_definitions.py    # 6 个工具的 OpenAI function calling 定义
+│   ├── ocr_service.py         # OCR 服务（vision LLM 提取交易）
+│   ├── tool_definitions.py    # 7 个工具的 OpenAI function calling 定义
 │   ├── personas.py            # 角色预设（4 种风格 + 自定义）
 │   └── statistics_service.py  # 统计业务逻辑（月度汇总、分类饼图、趋势）
 ├── api/v1/endpoints/
@@ -49,11 +51,13 @@ app/
 │   ├── bills.py               # 账单 CRUD + 文件上传解析
 │   ├── categories.py          # 分类 CRUD + 自动匹配
 │   ├── statistics.py          # 统计查询（月度汇总/分类饼图/消费趋势）
-│   └── chat.py                # AI 对话（非流式 + SSE 流式）
+│   ├── chat.py                # AI 对话（非流式 + SSE 流式）
+│   └── ocr.py                 # OCR 图片识别
 └── utils/
     ├── bill_parser.py          # 通用账单解析器（Excel/CSV/PDF）
     ├── wechat_parser.py        # 微信账单专用解析器
-    └── alipay_parser.py        # 支付宝账单专用解析器
+    ├── alipay_parser.py        # 支付宝账单专用解析器
+    └── image_utils.py          # 图片验证/压缩/base64
 alembic/
 ├── env.py                     # Alembic 环境配置（读取项目 DB URL）
 └── versions/                  # 迁移脚本目录
@@ -63,7 +67,8 @@ tests/
 ├── test_categories.py         # 分类系统测试（30 个用例）
 ├── test_statistics.py         # 统计 API 测试（12 个用例）
 ├── test_chat.py               # AI 对话测试（31 个用例）
-└── test_auth.py               # 认证测试（13 个用例）
+├── test_auth.py               # 认证测试（13 个用例）
+└── test_ocr.py                # OCR 测试（13 个用例）
 init_db.py                     # 数据库初始化（Alembic 迁移 + 种子数据）
 requirements.txt               # Python 依赖
 ```
@@ -119,7 +124,7 @@ uvicorn app.main:app --reload
 pytest tests/ -v
 ```
 
-当前 89 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设、会话持久化、用户认证等全部功能。
+当前 99 个测试用例，覆盖分类 CRUD、自动分类、账单导入、统计查询、AI 对话、工具调用、流式输出、角色预设、会话持久化、用户认证、OCR 图片识别等全部功能。
 
 ## 数据库迁移
 
@@ -228,6 +233,7 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | POST | `/api/v1/auth/register` | 用户注册 |
 | POST | `/api/v1/auth/login` | 用户登录 |
 | GET | `/api/v1/auth/me` | 获取当前用户信息 |
+| POST | `/api/v1/ocr/recognize` | OCR 图片识别（上传截图提取交易） |
 
 ## 默认分类
 
@@ -269,6 +275,29 @@ curl -X POST "http://localhost:8000/api/v1/auth/login" \
 curl "http://localhost:8000/api/v1/auth/me" \
   -H "Authorization: Bearer <token>"
 ```
+
+### OCR 图片识别
+
+上传账单截图或收据照片，vision LLM 自动提取交易日期、金额、商户名等结构化数据。基于智谱 GLM-4V（可配置为 GPT-4o 等其他多模态模型）。
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/ocr/recognize` | 上传图片，返回提取的交易列表 |
+
+```bash
+# 上传收据图片
+curl -X POST "http://localhost:8000/api/v1/ocr/recognize" \
+  -F "file=@receipt.jpg"
+# → {"success":true,"items":[{"payee":"麦当劳","amount":-35.0,...}]}
+```
+
+**模型选择**：通过 `.env` 配置 `VISION_MODEL` 切换多模态模型：
+```env
+VISION_MODEL=glm-4v        # 智谱 GLM-4V（默认，推荐中文场景）
+# VISION_MODEL=gpt-4o      # OpenAI GPT-4o（需切换 OPENAI_BASE_URL）
+```
+
+支持的图片格式：PNG / JPG / WebP，最大 10MB，自动压缩大图。
 
 ## AI 对话记账
 

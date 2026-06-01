@@ -1,3 +1,6 @@
+# app/core/dependencies.py
+"""FastAPI 依赖注入 — 认证、数据库等可复用依赖"""
+
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -7,17 +10,27 @@ from app.core.database import get_db
 from app.core.auth import decode_access_token
 from app.models.user import User
 
-# 定义安全方案
-security = HTTPBearer(bearerFormat="JWT", auto_error=False)
+# 在 Swagger 中显示 🔒 Authorize 按钮，用户可粘贴 Bearer token
+# auto_error=False 使 token 可选（兼容未认证使用场景）
+security_scheme = HTTPBearer(auto_error=False)
+
 
 def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
     db: Session = Depends(get_db),
 ) -> Optional[User]:
-    if credentials is None:
-        return None          # 未携带 token，返回 None
+    """从 Authorization 头提取 JWT token 并返回当前用户。
+    未提供 token 时返回 None（兼容未认证使用场景）。
+    token 无效或用户不存在时抛出 401。
 
-    # HTTPBearer 已自动解析出 token（去掉 "Bearer " 前缀）
+    使用方法：
+    1. 在 Swagger 中点击右上角 🔒 Authorize 按钮
+    2. 输入从 /register 或 /login 获取的 token（直接粘贴，无需 Bearer 前缀）
+    3. 再调用 /me 即可
+    """
+    if not credentials:
+        return None
+
     token = credentials.credentials
 
     try:

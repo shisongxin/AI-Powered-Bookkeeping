@@ -166,8 +166,23 @@ TOOLS: list[dict] = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "scan_receipt",
+            "description": "引导用户上传账单截图或收据照片进行 OCR 识别。当用户想通过拍照记账时，建议他们使用 /ocr/recognize 端点上传图片。此工具返回识别结果中可确认的交易列表。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "description": "用户描述的账单图片内容（如 午餐收据、超市小票）",
+                    },
+                },
+            },
+        },
+    },
 ]
-
 
 # 工具名称到简短描述的映射，用于构建 system prompt
 TOOL_DESCRIPTIONS: dict[str, str] = {
