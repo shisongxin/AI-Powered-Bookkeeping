@@ -13,11 +13,22 @@
 | 数据解析 | pandas, pdfplumber, chardet |
 | AI 对话 | OpenAI Function Calling（兼容 智谱/DeepSeek/Ollama） |
 | 配置管理 | pydantic-settings + python-dotenv |
+| Web 前端 | React 18 + TypeScript + Tailwind CSS + Axios |
 | 测试 | pytest 8.3 + httpx |
 
 ## 项目结构
 
 ```
+web/                             # Web 前端（React + Vite）
+├── src/
+│   ├── api/                     # Axios API 服务层 + JWT 拦截器
+│   ├── types/                   # TypeScript 类型定义（对齐后端 Schema）
+│   ├── components/Layout.tsx    # 响应式侧边栏布局
+│   └── pages/                   # 页面组件
+│       ├── Dashboard.tsx        # 仪表盘：月度汇总 + 分类分布 + 最近账单
+│       ├── Bills.tsx            # 账单明细：列表 + 文件上传(CSV/Excel/PDF/图片) + 创建
+│       ├── ChatPage.tsx         # AI 对话：SSE 流式 + OCR 识别 + 工具状态卡片
+│       └── Analysis.tsx         # 流水分析：趋势图 + 分类饼图 + 预算 vs 实际
 app/
 ├── main.py                    # FastAPI 应用入口
 ├── config.py                  # 配置管理（环境变量）
@@ -118,7 +129,25 @@ uvicorn app.main:app --reload
 
 访问 http://localhost:8000/docs 查看 Swagger API 文档。
 
-### 6. 运行测试
+### 6. 启动 Web 前端
+
+```bash
+cd web
+npm install              # 安装依赖（需 Node.js 18+）
+npm run dev              # 启动开发服务器 → http://localhost:3000
+```
+
+前端通过 Vite 代理 `/api/*` 到 `http://localhost:8000`，无需额外配置。
+
+**前端页面**：
+| 页面 | 路径 | 功能 |
+|---|---|---|
+| 仪表盘 | `/` | 月度收支汇总 + 分类进度条 + 最近账单列表 |
+| 账单明细 | `/bills` | 分页列表 + 文件上传(CSV/Excel/PDF 自动解析) + 手动创建 + 图片 OCR 识别记账 |
+| AI 记账 | `/chat` | SSE 流式对话 + 角色切换 + 图片上传 OCR + 工具调用状态卡片 |
+| 流水分析 | `/analysis` | 收支趋势柱状图 + 分类饼图 + 预算 vs 实际执行情况 |
+
+### 7. 运行测试
 
 ```bash
 pytest tests/ -v

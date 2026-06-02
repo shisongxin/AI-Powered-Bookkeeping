@@ -2,6 +2,7 @@
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.endpoints import bills, categories, chat, statistics, auth, ocr, budgets
 from app.config import settings
 
@@ -42,6 +43,15 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
+
+# CORS 中间件 — 允许 Web 前端跨域访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 注册路由
 app.include_router(bills.router, prefix=settings.API_V1_PREFIX)
