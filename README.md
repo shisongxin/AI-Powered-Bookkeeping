@@ -430,6 +430,5 @@ curl -X POST "http://localhost:8000/api/v1/chat/" \
 ## 计划中的功能
 
 - [x] **AI 记账对话** — LLM Function Calling + 流式输出 + Persona 角色系统
-- [ ] **OCR 图片识别** — 上传账单截图自动识别交易信息
-- [ ] **语音记账** — 语音输入转文字后自动生成账单记录
+- [x] **OCR 图片识别** — 上传账单截图自动识别交易信息
 - [x] **月度预算规划** — 预算 CRUD + vs-actual 对比 + AI 预算建议
