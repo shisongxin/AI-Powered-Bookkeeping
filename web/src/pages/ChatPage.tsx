@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { chatApi } from '../api/chat';
 import { ocrApi } from '../api/ocr';
-import type { ChatMessage, ToolCallRecord, SSEEvent } from '../types/chat';
+import type { ChatMessage, ToolCallRecord, SSEEvent, ConfirmRequired } from '../types/chat';
 import type { OCRResponse, ExtractedItem } from '../types/ocr';
 
 /** 工具名称 → 中文状态文案 */
@@ -36,6 +36,7 @@ export default function ChatPage() {
   const [ocrResult, setOcrResult] = useState<OCRResponse | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [confirmMode, setConfirmMode] = useState(true);  // 默认开启二次确认
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamCtrlRef = useRef<AbortController | null>(null);
@@ -59,6 +60,105 @@ export default function ChatPage() {
     });
   }, []);
 
+  // ---------- 确认/取消记账 ----------
+  const handleConfirm = useCallback((confirmData: ConfirmRequired, modifiedArgs?: Record<string, unknown>) => {
+    if (!sessionId) return;
+    setLoading(true);
+
+    // 更新确认卡片状态为"已确认"
+    setMessages((prev) => prev.map((m) =>
+      m.role === 'confirm_card' && m.confirmData?.tool_call_id === confirmData.tool_call_id
+        ? { ...m, confirmed: true, rejected: false }
+        : m
+    ));
+
+    // 调用确认接口，继续 AI 对话
+    streamCtrlRef.current = chatApi.confirmAction(
+      {
+        session_id: sessionId,
+        action: 'confirm',
+        modified_arguments: modifiedArgs,
+      },
+      {
+        onEvent: (evt: SSEEvent) => {
+          switch (evt.event) {
+            case 'status':
+              appendAssistant(`💭 ${evt.data}\n\n`);
+              break;
+            case 'tool_call': {
+              try {
+                const tc = JSON.parse(evt.data) as { tool_name: string; arguments: Record<string, unknown> };
+                const label = TOOL_LABELS[tc.tool_name] || `正在执行 ${tc.tool_name}...`;
+                addMsg({ role: 'tool_status', content: label, timestamp: Date.now() });
+              } catch { /* */ }
+              break;
+            }
+            case 'confirm_required': {
+              // 可能 LLM 又发起了新的 create_bill
+              try {
+                const cr = JSON.parse(evt.data) as ConfirmRequired;
+                addMsg({ role: 'confirm_card', content: '请确认记账', confirmData: cr, timestamp: Date.now() });
+              } catch { /* */ }
+              setLoading(false);
+              break;
+            }
+            case 'reply_chunk':
+              appendAssistant(evt.data);
+              break;
+            case 'error':
+              appendAssistant(`\n\n❌ ${evt.data}`);
+              break;
+          }
+        },
+        onError: (err) => {
+          appendAssistant(`\n\n❌ 出错了: ${err.message}`);
+          setLoading(false);
+        },
+        onDone: (sid) => {
+          if (sid) setSessionId(sid);
+          setLoading(false);
+        },
+      }
+    );
+  }, [sessionId, addMsg, appendAssistant]);
+
+  const handleReject = useCallback((confirmData: ConfirmRequired) => {
+    if (!sessionId) return;
+    setLoading(true);
+
+    // 更新确认卡片状态为"已取消"
+    setMessages((prev) => prev.map((m) =>
+      m.role === 'confirm_card' && m.confirmData?.tool_call_id === confirmData.tool_call_id
+        ? { ...m, confirmed: false, rejected: true }
+        : m
+    ));
+
+    // 调用确认接口，拒绝记账
+    streamCtrlRef.current = chatApi.confirmAction(
+      { session_id: sessionId, action: 'reject' },
+      {
+        onEvent: (evt: SSEEvent) => {
+          switch (evt.event) {
+            case 'reply_chunk':
+              appendAssistant(evt.data);
+              break;
+            case 'error':
+              appendAssistant(`\n\n❌ ${evt.data}`);
+              break;
+          }
+        },
+        onError: (err) => {
+          appendAssistant(`\n\n❌ 出错了: ${err.message}`);
+          setLoading(false);
+        },
+        onDone: (sid) => {
+          if (sid) setSessionId(sid);
+          setLoading(false);
+        },
+      }
+    );
+  }, [sessionId, appendAssistant]);
+
   // ---------- 发送消息 ----------
   const handleSend = async () => {
     const text = input.trim();
@@ -78,6 +178,7 @@ export default function ChatPage() {
         message: text,
         session_id: sessionId,
         persona: persona || undefined,
+        confirm_mode: confirmMode,
       },
       {
         onEvent: (evt: SSEEvent) => {
@@ -94,6 +195,15 @@ export default function ChatPage() {
                 const label = TOOL_LABELS[tc.tool_name] || `正在执行 ${tc.tool_name}...`;
                 addMsg({ role: 'tool_status', content: label, timestamp: Date.now() });
               } catch { /* ignore parse error */ }
+              break;
+            }
+
+            case 'confirm_required': {
+              // 需要用户二次确认记账
+              try {
+                const cr = JSON.parse(evt.data) as ConfirmRequired;
+                addMsg({ role: 'confirm_card', content: '请确认记账', confirmData: cr, timestamp: Date.now() });
+              } catch { /* */ }
               break;
             }
 
@@ -152,7 +262,7 @@ export default function ChatPage() {
         addMsg({ role: 'assistant', content: '', timestamp: Date.now() });
 
         streamCtrlRef.current = chatApi.sendStream(
-          { message: aiPrompt, session_id: sessionId, persona: persona || undefined },
+          { message: aiPrompt, session_id: sessionId, persona: persona || undefined, confirm_mode: confirmMode },
           {
             onEvent: (evt: SSEEvent) => {
               if (evt.event === 'reply_chunk') appendAssistant(evt.data);
@@ -161,6 +271,12 @@ export default function ChatPage() {
                   const tc = JSON.parse(evt.data) as { tool_name: string };
                   const label = TOOL_LABELS[tc.tool_name] || `正在执行 ${tc.tool_name}...`;
                   addMsg({ role: 'tool_status', content: label, timestamp: Date.now() });
+                } catch { /* */ }
+              }
+              if (evt.event === 'confirm_required') {
+                try {
+                  const cr = JSON.parse(evt.data) as ConfirmRequired;
+                  addMsg({ role: 'confirm_card', content: '请确认记账', confirmData: cr, timestamp: Date.now() });
                 } catch { /* */ }
               }
             },
@@ -178,6 +294,106 @@ export default function ChatPage() {
     }
     // 重置 input，允许重复选同一文件
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // ---------- 渲染确认卡片 ----------
+  const renderConfirmCard = (
+    msg: ChatMessage,
+    onConfirm: (data: ConfirmRequired, modifiedArgs?: Record<string, unknown>) => void,
+    onReject: (data: ConfirmRequired) => void,
+  ) => {
+    const args = msg.confirmData?.arguments;
+    if (!args) return null;
+
+    const amount = args.amount as number | undefined;
+    const isExpense = amount != null && amount < 0;
+
+    if (msg.confirmed) {
+      return (
+        <div className="flex items-center gap-2 my-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl">
+          <span className="text-lg">✅</span>
+          <span className="text-sm text-green-700 font-medium">已确认记账</span>
+          <span className="text-xs text-green-500 ml-auto">
+            {String(args.payee || '')} {amount != null ? `${Math.abs(amount).toFixed(2)}元` : ''}
+          </span>
+        </div>
+      );
+    }
+
+    if (msg.rejected) {
+      return (
+        <div className="flex items-center gap-2 my-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl">
+          <span className="text-lg">❌</span>
+          <span className="text-sm text-gray-500">已取消记账</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="my-2 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-lg">⚠️</span>
+          <span className="font-semibold text-amber-800 text-sm">确认记账？</span>
+          <span className="text-xs text-amber-500 ml-auto">AI 将创建此账单</span>
+        </div>
+
+        {/* 账单详情 */}
+        <div className="bg-white rounded-lg p-3 mb-3 space-y-1.5 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">金额</span>
+            <span className={`font-bold ${isExpense ? 'text-red-600' : 'text-green-600'}`}>
+              {amount != null ? `${isExpense ? '-' : '+'}${Math.abs(amount).toFixed(2)}元` : '未知'}
+            </span>
+          </div>
+          {args.category ? (
+            <div className="flex justify-between">
+              <span className="text-gray-500">分类</span>
+              <span className="text-gray-700">{String(args.category)}</span>
+            </div>
+          ) : null}
+          {args.payee ? (
+            <div className="flex justify-between">
+              <span className="text-gray-500">商户</span>
+              <span className="text-gray-700">{String(args.payee)}</span>
+            </div>
+          ) : null}
+          {args.description ? (
+            <div className="flex justify-between">
+              <span className="text-gray-500">描述</span>
+              <span className="text-gray-700">{String(args.description)}</span>
+            </div>
+          ) : null}
+          {args.transaction_date ? (
+            <div className="flex justify-between">
+              <span className="text-gray-500">日期</span>
+              <span className="text-gray-700">{String(args.transaction_date)}</span>
+            </div>
+          ) : null}
+          {args.payment_method ? (
+            <div className="flex justify-between">
+              <span className="text-gray-500">支付方式</span>
+              <span className="text-gray-700">{String(args.payment_method)}</span>
+            </div>
+          ) : null}
+        </div>
+
+        {/* 操作按钮 */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => onConfirm(msg.confirmData!)}
+            className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+          >
+            ✅ 确认记账
+          </button>
+          <button
+            onClick={() => onReject(msg.confirmData!)}
+            className="flex-1 px-4 py-2 bg-white text-gray-500 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    );
   };
 
   // ---------- 渲染工具状态卡片 ----------
@@ -226,6 +442,13 @@ export default function ChatPage() {
       <header className="flex items-center justify-between px-6 py-4 bg-white border-b shrink-0">
         <h1 className="text-xl font-bold text-gray-800">🤖 AI 智能记账</h1>
         <div className="flex items-center gap-3">
+          {/* 二次确认开关 */}
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none" title="开启后，AI 创建账单前需要你确认">
+            <input type="checkbox" checked={confirmMode} onChange={(e) => setConfirmMode(e.target.checked)}
+              className="w-3.5 h-3.5 rounded accent-primary-500" />
+            <span className={`${confirmMode ? 'text-primary-600 font-medium' : 'text-gray-400'}`}>确认</span>
+          </label>
+
           <select
             value={persona}
             onChange={(e) => setPersona(e.target.value)}
@@ -256,6 +479,13 @@ export default function ChatPage() {
         )}
 
         {messages.map((msg, i) => {
+          if (msg.role === 'confirm_card') {
+            return (
+              <div key={i} className="px-4 py-1">
+                {renderConfirmCard(msg, handleConfirm, handleReject)}
+              </div>
+            );
+          }
           if (msg.role === 'tool_status') {
             return <div key={i}>{renderToolCard(msg.content)}</div>;
           }

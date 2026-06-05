@@ -11,6 +11,14 @@ class ChatRequest(BaseModel):
     persona: Optional[str] = Field(None, description="角色风格: buddy/cat/analyst/homie/custom，留空使用配置默认值")
     image_base64: Optional[str] = Field(None, description="账单截图的 base64 编码（用于 OCR 识别记账）")
     image_content_type: Optional[str] = Field("image/jpeg", description="图片 MIME 类型")
+    confirm_mode: bool = Field(False, description="是否开启二次确认模式，创建账单时需要用户确认")
+
+
+class ConfirmActionRequest(BaseModel):
+    """用户对待确认操作的响应"""
+    session_id: str = Field(..., description="会话 ID")
+    action: str = Field(..., description="confirm 或 reject")
+    modified_arguments: Optional[dict] = Field(None, description="用户修改后的账单参数（仅 confirm 时有效）")
 
 
 class ToolCallRecord(BaseModel):

@@ -21,10 +21,10 @@ def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
     return service.create_bill(bill)
 
 @router.get("/", response_model=list[BillResponse])
-def get_bills(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """获取账单列表"""
+def get_bills(skip: int = 0, limit: int = 100, order: str = "desc", db: Session = Depends(get_db)):
+    """获取账单列表，默认按创建时间倒序（最新在前）。order=asc 可切换为正序"""
     service = BillService(db)
-    return service.get_bills(skip=skip, limit=limit)
+    return service.get_bills(skip=skip, limit=limit, order=order)
 
 # 文件上传接口
 @router.post("/upload")

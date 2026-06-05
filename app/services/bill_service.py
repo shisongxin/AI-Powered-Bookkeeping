@@ -21,8 +21,14 @@ class BillService:
         self.db.refresh(db_bill)
         return db_bill
 
-    def get_bills(self, skip: int = 0, limit: int = 100):
-        return self.db.query(Bill).offset(skip).limit(limit).all()
+    def get_bills(self, skip: int = 0, limit: int = 100, order: str = "desc"):
+        """获取账单列表，默认按创建时间倒序（最新在前）"""
+        q = self.db.query(Bill)
+        if order == "asc":
+            q = q.order_by(Bill.created_at.asc())
+        else:
+            q = q.order_by(Bill.created_at.desc())
+        return q.offset(skip).limit(limit).all()
 
     def _auto_categorize(self, rec: FlexibleBillRecord) -> tuple[str, Optional[int]]:
         """自动匹配分类，返回 (分类名, 分类ID)"""

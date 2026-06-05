@@ -302,7 +302,8 @@ class ChatService:
     在入口处锁定统一时间锚点，保证 LLM 和 OCR 使用同一时间基准。
     """
 
-    def __init__(self, db: Session, image_base64: str = "", image_content_type: str = "image/jpeg"):
+    def __init__(self, db: Session, image_base64: str = "", image_content_type: str = "image/jpeg",
+                 confirm_mode: bool = False):
         self.db = db
         self.session_svc = ChatSessionService(db)
         self.client = OpenAI(
@@ -314,6 +315,8 @@ class ChatService:
         # 图片数据（来自 ChatRequest），供 ToolExecutor 的 scan_receipt 使用
         self._image_b64 = image_base64
         self._image_type = image_content_type
+        # 二次确认模式：创建账单前需要用户确认
+        self._confirm_mode = confirm_mode
         # 延迟初始化 executor（在 chat/chat_stream 中创建，确保时间锚点已就绪）
         self.executor: Optional[ToolExecutor] = None
 
@@ -499,6 +502,23 @@ class ChatService:
                     "arguments": arguments,
                 }, ensure_ascii=False))
 
+                # 二次确认模式：create_bill 暂停等待用户确认
+                if self._confirm_mode and tool_name == "create_bill":
+                    # 保存当前历史（含 assistant tool_calls 但不含 create_bill 结果）
+                    self.session_svc.save(sid, history, persona)
+                    yield self._sse("confirm_required", json.dumps({
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                        "tool_call_id": tc.id,
+                    }, ensure_ascii=False))
+                    yield self._sse("done", json.dumps({
+                        "session_id": sid,
+                        "pending_confirmation": True,
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                    }, ensure_ascii=False))
+                    return  # 暂停流，等待用户确认
+
                 result_str = self._get_executor().execute(tool_name, arguments)
                 tool_records.append({
                     "tool_name": tool_name,
@@ -515,6 +535,141 @@ class ChatService:
         yield self._sse("done", json.dumps({
             "session_id": sid,
             "tool_calls": tool_records,
+        }, ensure_ascii=False))
+
+    def resume_after_confirmation(self, session_id: str, action: str,
+                                  modified_arguments: dict = None):
+        """用户确认/取消后恢复对话流。
+        action='confirm': 执行 create_bill 并继续 LLM 对话。
+        action='reject': 跳过 create_bill 并继续 LLM 对话。
+        """
+        sid, history = self.session_svc.get_or_create(session_id)
+
+        # 找到最后一个含 create_bill 的 assistant tool_calls 消息
+        pending_tc_id = None
+        pending_args = None
+        for msg in reversed(history):
+            if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                for tc in msg["tool_calls"]:
+                    if tc["function"]["name"] == "create_bill":
+                        pending_tc_id = tc["id"]
+                        pending_args = json.loads(tc["function"]["arguments"])
+                        break
+                if pending_tc_id:
+                    break
+
+        if not pending_tc_id:
+            yield self._sse("error", "未找到待确认的记账操作")
+            yield self._sse("done", json.dumps({"session_id": sid, "error": "no pending confirmation"}))
+            return
+
+        # 执行或跳过 create_bill
+        if action == "confirm":
+            args = modified_arguments if modified_arguments else pending_args
+            result_str = self._get_executor().execute("create_bill", args)
+        else:
+            result_str = json.dumps({
+                "status": "cancelled",
+                "message": "用户取消记账",
+            }, ensure_ascii=False)
+
+        history.append({
+            "role": "tool",
+            "tool_call_id": pending_tc_id,
+            "content": result_str,
+        })
+
+        # 继续 LLM 对话循环（与 chat_stream 后半部分相同）
+        yield from self._continue_conversation(history, sid)
+
+    def _continue_conversation(self, history: list[dict], sid: str):
+        """内部方法：从当前 history 继续 LLM 对话循环，产出 SSE 事件"""
+        for loop in range(3):
+            response = self.client.chat.completions.create(
+                model=settings.LLM_MODEL,
+                messages=history,
+                tools=TOOLS,
+                temperature=settings.LLM_TEMPERATURE,
+                max_tokens=512,
+            )
+            msg = response.choices[0].message
+
+            # 无工具调用 → 流式输出最终回复
+            if not msg.tool_calls:
+                yield self._sse("status", "正在组织回复...")
+                full_reply = ""
+                stream = self.client.chat.completions.create(
+                    model=settings.LLM_MODEL,
+                    messages=history,
+                    temperature=settings.LLM_TEMPERATURE,
+                    max_tokens=settings.LLM_MAX_TOKENS,
+                    stream=True,
+                )
+                for chunk in stream:
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        full_reply += delta.content
+                        yield self._sse("reply_chunk", delta.content)
+                history.append({"role": "assistant", "content": full_reply})
+                _prune_history(history, keep_recent=settings.CHAT_KEEP_RECENT_ROUNDS + 5)
+                self.session_svc.save(sid, history)
+                yield self._sse("done", json.dumps({
+                    "session_id": sid,
+                    "tool_calls": [],
+                }, ensure_ascii=False))
+                return
+
+            # 有工具调用
+            history.append({
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        },
+                    }
+                    for tc in msg.tool_calls
+                ],
+            })
+
+            for tc in msg.tool_calls:
+                tool_name = tc.function.name
+                arguments = json.loads(tc.function.arguments)
+                yield self._sse("tool_call", json.dumps({
+                    "tool_name": tool_name,
+                    "arguments": arguments,
+                }, ensure_ascii=False))
+
+                # 二次确认：如果 LLM 再次调用 create_bill，同样暂停
+                if self._confirm_mode and tool_name == "create_bill":
+                    self.session_svc.save(sid, history)
+                    yield self._sse("confirm_required", json.dumps({
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                        "tool_call_id": tc.id,
+                    }, ensure_ascii=False))
+                    yield self._sse("done", json.dumps({
+                        "session_id": sid,
+                        "pending_confirmation": True,
+                        "tool_name": tool_name,
+                        "arguments": arguments,
+                    }, ensure_ascii=False))
+                    return
+
+                result_str = self._get_executor().execute(tool_name, arguments)
+                history.append({
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "content": result_str,
+                })
+
+        yield self._sse("error", "处理超时，请稍后重试")
+        yield self._sse("done", json.dumps({
+            "session_id": sid,
         }, ensure_ascii=False))
 
     @staticmethod

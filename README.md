@@ -1,7 +1,7 @@
 # BillAgent — AI-Powered Bookkeeping
 
 智能记账助手APP，支持多格式账单文件导入、自动分类、统计分析、AI 对话、消费分析和预算规划功能。
-
+![alt text](figure/image.png)
 ## 技术栈
 
 | 层 | 技术 |

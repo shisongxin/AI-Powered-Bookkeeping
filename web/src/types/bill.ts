@@ -7,6 +7,11 @@ export interface BillCreate {
   note?: string | null;
   raw_text?: string | null;
   transaction_date?: string | null;
+  payee?: string | null;
+  description?: string | null;
+  direction?: string | null;
+  payment_method?: string | null;
+  remark?: string | null;
 }
 
 export interface BillResponse {
