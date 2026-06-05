@@ -29,20 +29,39 @@ const PERSONAS = [
 ];
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('billagent_messages');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [persona, setPersona] = useState('');
+  const [persona, setPersona] = useState(() => localStorage.getItem('billagent_persona') || '');
   const [ocrResult, setOcrResult] = useState<OCRResponse | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(() => localStorage.getItem('billagent_session_id'));
   const [confirmMode, setConfirmMode] = useState(true);  // 默认开启二次确认
+  // 可编辑确认：正在编辑的确认卡片 tool_call_id
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<Record<string, string>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamCtrlRef = useRef<AbortController | null>(null);
 
   // 自动滚到底部
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages]);
+
+  // 会话持久化：切换页面时保留对话
+  useEffect(() => {
+    localStorage.setItem('billagent_messages', JSON.stringify(messages));
+  }, [messages]);
+  useEffect(() => {
+    if (sessionId) localStorage.setItem('billagent_session_id', sessionId);
+  }, [sessionId]);
+  useEffect(() => {
+    localStorage.setItem('billagent_persona', persona);
+  }, [persona]);
 
   // 添加消息
   const addMsg = useCallback((msg: ChatMessage) => {
@@ -296,17 +315,58 @@ export default function ChatPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // ---------- 渲染确认卡片 ----------
+  // ---------- 渲染确认卡片（支持编辑） ----------
   const renderConfirmCard = (
     msg: ChatMessage,
     onConfirm: (data: ConfirmRequired, modifiedArgs?: Record<string, unknown>) => void,
     onReject: (data: ConfirmRequired) => void,
   ) => {
     const args = msg.confirmData?.arguments;
+    const tcId = msg.confirmData?.tool_call_id || '';
     if (!args) return null;
 
-    const amount = args.amount as number | undefined;
+    const isEditing = editingCardId === tcId;
+
+    // 合并原始参数和编辑后的值
+    const displayArgs = isEditing ? { ...args, ...editForm } : args;
+    const amount = displayArgs.amount as number | undefined;
     const isExpense = amount != null && amount < 0;
+
+    const startEdit = () => {
+      setEditingCardId(tcId);
+      setEditForm({
+        amount: String(args.amount ?? ''),
+        category: String(args.category ?? ''),
+        payee: String(args.payee ?? ''),
+        description: String(args.description ?? ''),
+        transaction_date: String(args.transaction_date ?? ''),
+        payment_method: String(args.payment_method ?? ''),
+      });
+    };
+
+    const cancelEdit = () => {
+      setEditingCardId(null);
+      setEditForm({});
+    };
+
+    const confirmWithEdit = () => {
+      // 从 editForm 构建修改后的参数
+      const modified: Record<string, unknown> = {};
+      const editAmount = parseFloat(editForm.amount);
+      if (!isNaN(editAmount)) modified.amount = editAmount;
+      if (editForm.category) modified.category = editForm.category;
+      if (editForm.payee) modified.payee = editForm.payee;
+      if (editForm.description) modified.description = editForm.description;
+      if (editForm.transaction_date) modified.transaction_date = editForm.transaction_date;
+      if (editForm.payment_method) modified.payment_method = editForm.payment_method;
+      onConfirm(msg.confirmData!, modified);
+      setEditingCardId(null);
+      setEditForm({});
+    };
+
+    const updateField = (field: string, value: string) => {
+      setEditForm((prev) => ({ ...prev, [field]: value }));
+    };
 
     if (msg.confirmed) {
       return (
@@ -334,63 +394,99 @@ export default function ChatPage() {
         <div className="flex items-center gap-2 mb-3">
           <span className="text-lg">⚠️</span>
           <span className="font-semibold text-amber-800 text-sm">确认记账？</span>
-          <span className="text-xs text-amber-500 ml-auto">AI 将创建此账单</span>
+          <span className="text-xs text-amber-500 ml-auto">
+            {isEditing ? '修改账单信息' : 'AI 将创建此账单'}
+          </span>
         </div>
 
-        {/* 账单详情 */}
+        {/* 账单详情 / 编辑表单 */}
         <div className="bg-white rounded-lg p-3 mb-3 space-y-1.5 text-sm">
-          <div className="flex justify-between">
-            <span className="text-gray-500">金额</span>
-            <span className={`font-bold ${isExpense ? 'text-red-600' : 'text-green-600'}`}>
-              {amount != null ? `${isExpense ? '-' : '+'}${Math.abs(amount).toFixed(2)}元` : '未知'}
-            </span>
-          </div>
-          {args.category ? (
-            <div className="flex justify-between">
-              <span className="text-gray-500">分类</span>
-              <span className="text-gray-700">{String(args.category)}</span>
-            </div>
-          ) : null}
-          {args.payee ? (
-            <div className="flex justify-between">
-              <span className="text-gray-500">商户</span>
-              <span className="text-gray-700">{String(args.payee)}</span>
-            </div>
-          ) : null}
-          {args.description ? (
-            <div className="flex justify-between">
-              <span className="text-gray-500">描述</span>
-              <span className="text-gray-700">{String(args.description)}</span>
-            </div>
-          ) : null}
-          {args.transaction_date ? (
-            <div className="flex justify-between">
-              <span className="text-gray-500">日期</span>
-              <span className="text-gray-700">{String(args.transaction_date)}</span>
-            </div>
-          ) : null}
-          {args.payment_method ? (
-            <div className="flex justify-between">
-              <span className="text-gray-500">支付方式</span>
-              <span className="text-gray-700">{String(args.payment_method)}</span>
-            </div>
-          ) : null}
+          {isEditing ? (
+            <>
+              <EditField label="金额" value={editForm.amount}
+                onChange={(v) => updateField('amount', v)} type="number" hint="支出为负数" />
+              <EditField label="分类" value={editForm.category}
+                onChange={(v) => updateField('category', v)} />
+              <EditField label="商户" value={editForm.payee}
+                onChange={(v) => updateField('payee', v)} />
+              <EditField label="描述" value={editForm.description}
+                onChange={(v) => updateField('description', v)} />
+              <EditField label="日期" value={editForm.transaction_date}
+                onChange={(v) => updateField('transaction_date', v)} type="date" />
+              <EditField label="支付方式" value={editForm.payment_method}
+                onChange={(v) => updateField('payment_method', v)} />
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <span className="text-gray-500">金额</span>
+                <span className={`font-bold ${isExpense ? 'text-red-600' : 'text-green-600'}`}>
+                  {amount != null ? `${isExpense ? '-' : '+'}${Math.abs(amount).toFixed(2)}元` : '未知'}
+                </span>
+              </div>
+              {displayArgs.category ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">分类</span>
+                  <span className="text-gray-700">{String(displayArgs.category)}</span>
+                </div>
+              ) : null}
+              {displayArgs.payee ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">商户</span>
+                  <span className="text-gray-700">{String(displayArgs.payee)}</span>
+                </div>
+              ) : null}
+              {displayArgs.description ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">描述</span>
+                  <span className="text-gray-700">{String(displayArgs.description)}</span>
+                </div>
+              ) : null}
+              {displayArgs.transaction_date ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">日期</span>
+                  <span className="text-gray-700">{String(displayArgs.transaction_date)}</span>
+                </div>
+              ) : null}
+              {displayArgs.payment_method ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">支付方式</span>
+                  <span className="text-gray-700">{String(displayArgs.payment_method)}</span>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         {/* 操作按钮 */}
         <div className="flex gap-2">
-          <button
-            onClick={() => onConfirm(msg.confirmData!)}
-            className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
-          >
-            ✅ 确认记账
-          </button>
-          <button
-            onClick={() => onReject(msg.confirmData!)}
-            className="flex-1 px-4 py-2 bg-white text-gray-500 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-          >
-            取消
-          </button>
+          {isEditing ? (
+            <>
+              <button onClick={confirmWithEdit}
+                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
+                ✅ 确认修改并记账
+              </button>
+              <button onClick={cancelEdit}
+                className="flex-1 px-4 py-2 bg-white text-gray-500 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                取消修改
+              </button>
+            </>
+          ) : (
+            <>
+              <button onClick={() => onConfirm(msg.confirmData!)}
+                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors">
+                ✅ 确认记账
+              </button>
+              <button onClick={startEdit}
+                className="px-4 py-2 bg-white text-blue-500 border border-blue-300 rounded-lg text-sm hover:bg-blue-50 transition-colors">
+                修改
+              </button>
+              <button onClick={() => onReject(msg.confirmData!)}
+                className="px-4 py-2 bg-white text-gray-500 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                取消
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -459,7 +555,13 @@ export default function ChatPage() {
             ))}
           </select>
           <button
-            onClick={() => { setMessages([]); setSessionId(null); setOcrResult(null); }}
+            onClick={() => {
+              setMessages([]);
+              setSessionId(null);
+              setOcrResult(null);
+              localStorage.removeItem('billagent_messages');
+              localStorage.removeItem('billagent_session_id');
+            }}
             className="text-sm text-gray-400 hover:text-gray-600"
           >
             新对话
@@ -577,6 +679,28 @@ export default function ChatPage() {
           AI 可能产生不准确信息，请核对记账结果
         </p>
       </div>
+    </div>
+  );
+}
+
+/** 确认卡片中的可编辑字段子组件 */
+function EditField({ label, value, onChange, type = 'text', hint }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-gray-500 w-16 shrink-0 text-xs">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 border rounded px-2 py-1 text-sm focus:outline-none focus:border-primary-500"
+        placeholder={hint}
+      />
     </div>
   );
 }

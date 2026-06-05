@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL: str = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
     LLM_MODEL: str = os.getenv("LLM_MODEL", "gpt-4o-mini")
-    LLM_MAX_TOKENS: int = 1024
+    LLM_MAX_TOKENS: int = 4096
     LLM_TEMPERATURE: float = 0.7
     # 多模态模型（用于 OCR 图片识别，需支持 vision）
     VISION_MODEL: str = os.getenv("VISION_MODEL", "glm-4v")

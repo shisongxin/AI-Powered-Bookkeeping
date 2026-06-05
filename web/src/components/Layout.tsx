@@ -1,18 +1,42 @@
-/** 响应式布局 — 侧边栏导航 + 内容区 */
+/** 响应式布局 — 侧边栏导航 + 用户状态 + 内容区 */
 
-import { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { authApi } from '../api/auth';
+import type { UserResponse } from '../types/auth';
 
 const NAV_ITEMS = [
-  { to: '/',        icon: '📊', label: '仪表盘',  end: true },
-  { to: '/bills',   icon: '📋', label: '账单明细' },
-  { to: '/chat',    icon: '🤖', label: 'AI 记账'  },
-  { to: '/analysis',icon: '📈', label: '流水分析' },
+  { to: '/',           icon: '📊', label: '仪表盘',     end: true },
+  { to: '/bills',      icon: '📋', label: '账单明细' },
+  { to: '/chat',       icon: '🤖', label: 'AI 记账'  },
+  { to: '/analysis',   icon: '📈', label: '流水分析' },
+  { to: '/categories', icon: '🏷️', label: '分类管理' },
 ];
 
 export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
-  const location = useLocation();
+  const [user, setUser] = useState<UserResponse | null>(null);
+  const navigate = useNavigate();
+
+  // 检查登录状态
+  useEffect(() => {
+    const token = localStorage.getItem('billagent_token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    authApi.me().then(setUser).catch(() => {
+      // token 失效，跳转登录
+      localStorage.removeItem('billagent_token');
+      navigate('/login');
+    });
+  }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('billagent_token');
+    setUser(null);
+    navigate('/login');
+  };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -45,13 +69,23 @@ export default function Layout() {
           ))}
         </nav>
 
-        {/* 折叠按钮 */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-3 text-gray-400 hover:text-gray-600 border-t border-gray-100 text-sm"
-        >
-          {collapsed ? '▶' : '◀'}
-        </button>
+        {/* 用户状态 + 折叠按钮 */}
+        <div className="border-t border-gray-100">
+          {user && !collapsed && (
+            <div className="px-4 py-2 text-xs text-gray-500">
+              <span className="block truncate font-medium text-gray-700">{user.username}</span>
+              <button onClick={handleLogout} className="text-gray-400 hover:text-red-500 transition-colors">
+                退出登录
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="w-full p-3 text-gray-400 hover:text-gray-600 text-sm"
+          >
+            {collapsed ? '▶' : '◀'}
+          </button>
+        </div>
       </aside>
 
       {/* 主内容区 */}

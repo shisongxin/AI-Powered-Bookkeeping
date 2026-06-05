@@ -374,9 +374,9 @@ class ChatService:
     def _run_conversation(self, history: list[dict], tool_records: list[dict]) -> str:
         """执行对话循环，工具选择用低 token，最终回复用高 token"""
         for loop in range(3):
-            # 工具选择阶段用较小 max_tokens 加速响应
+            # 工具选择阶段用适中 max_tokens（DeepSeek 等推理模型 thinking 令牌包含在内）
             is_first_pass = (loop == 0)
-            max_tok = 512 if is_first_pass else settings.LLM_MAX_TOKENS
+            max_tok = 2048 if is_first_pass else settings.LLM_MAX_TOKENS
 
             response = self.client.chat.completions.create(
                 model=settings.LLM_MODEL,
@@ -447,7 +447,7 @@ class ChatService:
                 messages=history,
                 tools=TOOLS,
                 temperature=settings.LLM_TEMPERATURE,
-                max_tokens=512,
+                max_tokens=2048,
             )
             msg = response.choices[0].message
 
@@ -590,7 +590,7 @@ class ChatService:
                 messages=history,
                 tools=TOOLS,
                 temperature=settings.LLM_TEMPERATURE,
-                max_tokens=512,
+                max_tokens=2048,
             )
             msg = response.choices[0].message
 
