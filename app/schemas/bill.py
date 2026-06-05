@@ -13,6 +13,20 @@ class BillBase(BaseModel):
 class BillCreate(BillBase):
     pass
 
+
+class BillUpdate(BaseModel):
+    """可更新字段，全部可选"""
+    amount: Optional[float] = None
+    category: Optional[str] = None
+    category_id: Optional[int] = None
+    note: Optional[str] = None
+    transaction_date: Optional[datetime] = None
+    payee: Optional[str] = None
+    description: Optional[str] = None
+    direction: Optional[str] = None
+    payment_method: Optional[str] = None
+    remark: Optional[str] = None
+
 class BillResponse(BillBase):
     id: int
     created_at: datetime

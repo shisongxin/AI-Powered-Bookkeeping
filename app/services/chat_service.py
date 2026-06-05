@@ -147,7 +147,7 @@ class ToolExecutor:
         return json.dumps({"count": len(result), "bills": result}, ensure_ascii=False)
 
     def _create_bill(self, args: dict) -> str:
-        """创建一条账单记录"""
+        """创建一条账单记录。自动补全 category_id，确保 其他/未分类 等分类正常入库。"""
         svc = BillService(self.db)
 
         # 解析日期
@@ -161,15 +161,19 @@ class ToolExecutor:
                 except ValueError:
                     continue
 
+        # 分类名：默认使用"其他"（种子数据中的兜底分类）
+        category_name = args.get("category") or "其他"
+
         bill_data = BillCreate(
             amount=float(args["amount"]),
-            category=args.get("category", "未分类"),
+            category=category_name,
+            category_id=svc._resolve_category_id(category_name),
             transaction_date=trans_date,
             note=args.get("remark"),
         )
         bill = svc.create_bill(bill_data)
 
-        # 补充 direction/payee/description/remark 字段（不在 BillCreate 中，需要直接更新）
+        # 补充 direction/payee/description/remark 字段
         if args.get("direction"):
             bill.direction = args["direction"]
         if args.get("payee"):

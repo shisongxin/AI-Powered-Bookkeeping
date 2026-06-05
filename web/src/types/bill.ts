@@ -35,6 +35,28 @@ export interface BillResponse {
   created_at: string;
 }
 
+export interface BillUpdate {
+  amount?: number | null;
+  category?: string | null;
+  category_id?: number | null;
+  note?: string | null;
+  transaction_date?: string | null;
+  payee?: string | null;
+  description?: string | null;
+  direction?: string | null;
+  payment_method?: string | null;
+  remark?: string | null;
+}
+
+export interface BillSearchParams {
+  keyword?: string;
+  start_date?: string;
+  end_date?: string;
+  category?: string;
+  skip?: number;
+  limit?: number;
+}
+
 export interface BillUploadResponse {
   success: boolean;
   message: string;

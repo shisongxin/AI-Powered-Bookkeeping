@@ -1,8 +1,10 @@
 # app/services/bill_service.py
 
+from datetime import datetime
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from app.models.bill import Bill
-from app.schemas.bill import BillCreate, FlexibleBillRecord
+from app.schemas.bill import BillCreate, BillUpdate, FlexibleBillRecord
 from app.services.category_service import CategoryService
 from typing import List, Optional
 import logging
@@ -14,8 +16,22 @@ class BillService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _resolve_category_id(self, category_name: str) -> Optional[int]:
+        """根据分类名查找 category_id，找不到返回 None"""
+        if not category_name:
+            return None
+        cat_svc = CategoryService(self.db)
+        cats = cat_svc.get_all()
+        for c in cats:
+            if c.name == category_name:
+                return c.id
+        return None
+
     def create_bill(self, bill_data: BillCreate) -> Bill:
         db_bill = Bill(**bill_data.model_dump())
+        # 自动补全 category_id
+        if not db_bill.category_id and db_bill.category:
+            db_bill.category_id = self._resolve_category_id(db_bill.category)
         self.db.add(db_bill)
         self.db.commit()
         self.db.refresh(db_bill)
@@ -30,8 +46,56 @@ class BillService:
             q = q.order_by(Bill.created_at.desc())
         return q.offset(skip).limit(limit).all()
 
+    def update_bill(self, bill_id: int, data: BillUpdate) -> Optional[Bill]:
+        """更新已有账单的部分字段"""
+        bill = self.db.query(Bill).filter(Bill.id == bill_id).first()
+        if not bill:
+            return None
+        update_dict = data.model_dump(exclude_unset=True)
+        for key, val in update_dict.items():
+            setattr(bill, key, val)
+        # 如果更新了 category，自动补全 category_id
+        if "category" in update_dict and not update_dict.get("category_id"):
+            bill.category_id = self._resolve_category_id(bill.category)
+        self.db.commit()
+        self.db.refresh(bill)
+        return bill
+
+    def search_bills(self, keyword: str = "", start_date: str = "",
+                     end_date: str = "", category: str = "",
+                     skip: int = 0, limit: int = 100) -> List[Bill]:
+        """搜索账单：支持关键词（匹配 payee/description/remark）、日期范围、分类"""
+        q = self.db.query(Bill)
+
+        if keyword:
+            like_pat = f"%{keyword}%"
+            q = q.filter(or_(
+                Bill.payee.like(like_pat),
+                Bill.description.like(like_pat),
+                Bill.remark.like(like_pat),
+            ))
+
+        if start_date:
+            try:
+                dt = datetime.strptime(start_date, "%Y-%m-%d")
+                q = q.filter(Bill.transaction_date >= dt)
+            except ValueError:
+                pass
+
+        if end_date:
+            try:
+                dt = datetime.strptime(end_date, "%Y-%m-%d")
+                q = q.filter(Bill.transaction_date <= dt)
+            except ValueError:
+                pass
+
+        if category:
+            q = q.filter(Bill.category == category)
+
+        return q.order_by(Bill.created_at.desc()).offset(skip).limit(limit).all()
+
     def _auto_categorize(self, rec: FlexibleBillRecord) -> tuple[str, Optional[int]]:
-        """自动匹配分类，返回 (分类名, 分类ID)"""
+        """自动匹配分类，返回 (分类名, 分类ID)。匹配不到则使用 其他（兜底分类）。"""
         cat_svc = CategoryService(self.db)
         search_text = " ".join(filter(None, [
             rec.payee or "",
@@ -42,7 +106,10 @@ class BillService:
         matched = cat_svc.auto_match(search_text)
         if matched:
             return matched.name, matched.id
-        return rec.transaction_type or "未分类", None
+        # 优先使用 transaction_type，其次使用 "其他"（种子数据中的兜底分类）
+        fallback = rec.transaction_type or "其他"
+        fallback_id = self._resolve_category_id(fallback)
+        return fallback, fallback_id
 
     def import_from_parsed_records(self, records: List[FlexibleBillRecord]) -> dict:
         db = self.db

@@ -1,7 +1,7 @@
 /** Bills API — 创建/查询/文件上传 */
 
 import client from './client';
-import type { BillCreate, BillResponse, BillUploadResponse } from '../types/bill';
+import type { BillCreate, BillUpdate, BillResponse, BillSearchParams, BillUploadResponse } from '../types/bill';
 
 export const billsApi = {
   create: (data: BillCreate) =>
@@ -17,4 +17,10 @@ export const billsApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }).then((r) => r.data);
   },
+
+  update: (id: number, data: BillUpdate) =>
+    client.put<BillResponse>(`/bills/${id}`, data).then((r) => r.data),
+
+  search: (params: BillSearchParams) =>
+    client.get<BillResponse[]>('/bills/search', { params }).then((r) => r.data),
 };

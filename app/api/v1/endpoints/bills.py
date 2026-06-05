@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.bill_service import BillService
-from app.schemas.bill import BillCreate, BillResponse
+from app.schemas.bill import BillCreate, BillUpdate, BillResponse
 from app.utils.bill_parser import parse_bill
 import os
 import shutil
@@ -98,3 +98,35 @@ def upload_bill_file(
                 logger.info(f"临时文件已删除: {temp_path}")
         except Exception:
             logger.warning(f"临时文件删除失败: {temp_path}")
+
+
+@router.put("/{bill_id}", response_model=BillResponse)
+def update_bill(bill_id: int, data: BillUpdate, db: Session = Depends(get_db)):
+    """更新指定账单的部分字段"""
+    service = BillService(db)
+    bill = service.update_bill(bill_id, data)
+    if not bill:
+        raise HTTPException(status_code=404, detail="账单不存在")
+    return bill
+
+
+@router.get("/search", response_model=list[BillResponse])
+def search_bills(
+    keyword: str = "",
+    start_date: str = "",
+    end_date: str = "",
+    category: str = "",
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    """搜索账单：支持关键词（匹配商户/描述/备注）、日期范围、分类过滤"""
+    service = BillService(db)
+    return service.search_bills(
+        keyword=keyword,
+        start_date=start_date,
+        end_date=end_date,
+        category=category,
+        skip=skip,
+        limit=limit,
+    )
