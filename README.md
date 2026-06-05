@@ -23,12 +23,15 @@ web/                             # Web 前端（React + Vite）
 ├── src/
 │   ├── api/                     # Axios API 服务层 + JWT 拦截器
 │   ├── types/                   # TypeScript 类型定义（对齐后端 Schema）
-│   ├── components/Layout.tsx    # 响应式侧边栏布局
+│   ├── components/Layout.tsx    # 响应式侧边栏布局 + 用户状态
 │   └── pages/                   # 页面组件
-│       ├── Dashboard.tsx        # 仪表盘：月度汇总 + 分类分布 + 最近账单
-│       ├── Bills.tsx            # 账单明细：列表 + 文件上传(CSV/Excel/PDF/图片) + 创建
-│       ├── ChatPage.tsx         # AI 对话：SSE 流式 + OCR 识别 + 工具状态卡片
-│       └── Analysis.tsx         # 流水分析：趋势图 + 分类饼图 + 预算 vs 实际
+│       ├── Dashboard.tsx        # 仪表盘：月度汇总卡片 + 分类分布 + 最近账单
+│       ├── Bills.tsx            # 账单明细：分页列表 + 文件上传 + OCR识别 + 手动创建
+│       ├── ChatPage.tsx         # AI 对话：SSE 流式 + 二次确认 + OCR + 工具状态卡片
+│       ├── Analysis.tsx         # 流水分析：折线图(Recharts) + 环形饼图 + 预算执行
+│       ├── Categories.tsx       # 分类管理：CRUD + 图标/颜色/关键词
+│       ├── Login.tsx            # 登录页面
+│       └── Register.tsx         # 注册页面
 app/
 ├── main.py                    # FastAPI 应用入口
 ├── config.py                  # 配置管理（环境变量）
@@ -142,10 +145,13 @@ npm run dev              # 启动开发服务器 → http://localhost:3000
 **前端页面**：
 | 页面 | 路径 | 功能 |
 |---|---|---|
-| 仪表盘 | `/` | 月度收支汇总 + 分类进度条 + 最近账单列表 |
-| 账单明细 | `/bills` | 分页列表 + 文件上传(CSV/Excel/PDF 自动解析) + 手动创建 + 图片 OCR 识别记账 |
-| AI 记账 | `/chat` | SSE 流式对话 + 角色切换 + 图片上传 OCR + 工具调用状态卡片 |
-| 流水分析 | `/analysis` | 收支趋势柱状图 + 分类饼图 + 预算 vs 实际执行情况 |
+| 登录 | `/login` | 用户登录，JWT 令牌存储到 localStorage |
+| 注册 | `/register` | 新用户注册（含表单验证），成功后跳转登录 |
+| 仪表盘 | `/` | 月度收支汇总卡片 + 分类分布进度条 + 最近5笔账单 |
+| 账单明细 | `/bills` | 分页列表（时间倒序）+ CSV/Excel/PDF 上传解析 + 图片 OCR 识别记账 + 手动创建 |
+| AI 记账 | `/chat` | SSE 流式对话 + 二次确认模式 + 可编辑确认卡片 + 角色切换 + OCR 识别 + 实时状态指示器 |
+| 流水分析 | `/analysis` | 收支折线图(Recharts) + 分类环形饼图 + 预算 vs 实际执行（三色状态） |
+| 分类管理 | `/categories` | 分类 CRUD + 图标/颜色/关键词管理 |
 
 ### 7. 运行测试
 
@@ -258,7 +264,8 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | GET | `/api/v1/statistics/by-category` | 按分类统计 |
 | GET | `/api/v1/statistics/trend` | 消费趋势 |
 | POST | `/api/v1/chat/` | AI 对话（非流式） |
-| POST | `/api/v1/chat/stream` | AI 对话（SSE 流式 + 工具进度） |
+| POST | `/api/v1/chat/stream` | AI 对话（SSE 流式 + 工具进度 + 二次确认） |
+| POST | `/api/v1/chat/confirm` | 确认/取消待处理的 create_bill |
 | POST | `/api/v1/auth/register` | 用户注册 |
 | POST | `/api/v1/auth/login` | 用户登录 |
 | GET | `/api/v1/auth/me` | 获取当前用户信息 |
@@ -450,14 +457,46 @@ curl -X POST "http://localhost:8000/api/v1/chat/" \
 | `get_budget_status` | "预算还剩多少"、"哪个分类超支了" |
 | `suggest_budget` | "下个月预算设多少合适" |
 
+### 二次确认模式
+
+AI 记账支持二次确认，防止 LLM 误创建账单。通过 ChatRequest 的 `confirm_mode: true` 开启（Web 前端默认开启）：
+
+```
+用户: "午餐麦当劳35元"
+  → SSE: status("正在分析...")
+  → SSE: tool_call(create_bill) → 🔒 暂停，不执行
+  → SSE: confirm_required({tool_name, arguments})
+  → SSE: done(pending_confirmation: true)
+
+前端显示确认卡片：
+  ├── 查看账单详情
+  ├── [修改] → 可编辑表单（支持分类下拉选择）
+  ├── [确认记账] → POST /chat/confirm {action: "confirm"}
+  └── [取消] → POST /chat/confirm {action: "reject"}
+```
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/v1/chat/confirm` | 确认/取消待处理的 create_bill 操作 |
+
 ### 速度优化
 
-- 首次工具选择阶段 max_tokens=512，快速判断是否需要调工具
-- 最终回复阶段 max_tokens=1024，保证回复质量
+- 工具选择阶段 max_tokens=2048（适配 DeepSeek 等推理模型的 thinking token 开销）
+- 最终回复阶段 max_tokens=4096 + 流式输出（逐 token 推送）
 - System prompt 精简至 ~200 tokens，减少处理延迟
+- 状态提示原地更新（不累积到消息内容中）
 
 ## 计划中的功能
 
 - [x] **AI 记账对话** — LLM Function Calling + 流式输出 + Persona 角色系统
 - [x] **OCR 图片识别** — 上传账单截图自动识别交易信息
 - [x] **月度预算规划** — 预算 CRUD + vs-actual 对比 + AI 预算建议
+- [x] **用户认证系统** — JWT 注册/登录 + bcrypt 密码哈希
+- [x] **Web 前端** — React 18 + TypeScript + Tailwind CSS + Recharts 图表
+- [x] **二次确认记账** — create_bill 暂停等待用户确认/修改/取消
+- [x] **AI 状态实时更新** — 状态提示原地更新不累积
+- [x] **分类管理页面** — 前端分类 CRUD + 图标/颜色/关键词
+- [x] **会话持久化** — 切换页面保留对话（localStorage）+ 后端 TTL 7天
+- [ ] 语音记账 — Whisper API 语音转文字
+- [ ] Docker 部署 — docker-compose 一键启动
+- [ ] App 前端 — React Native / Flutter
