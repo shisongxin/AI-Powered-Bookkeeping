@@ -350,10 +350,15 @@ class ChatService:
         """处理用户消息，返回包含回复和工具调用追踪的结果。会话持久化到 DB，支持 TTL 压缩。"""
         sid, history = self.session_svc.get_or_create(session_id)
 
-        # 新会话：构建带统一时间锚点的 system prompt
+        # 始终刷新 system prompt 中的当前时间（每次对话都更新为实时时间）
+        persona_prompt = _get_persona_prompt(persona)
+        system_msg = {"role": "system", "content": _build_system_prompt(persona_prompt, self._time_anchor)}
         if not history:
-            persona_prompt = _get_persona_prompt(persona)
-            history.append({"role": "system", "content": _build_system_prompt(persona_prompt, self._time_anchor)})
+            history.append(system_msg)
+        elif history[0].get("role") == "system":
+            history[0] = system_msg  # 替换旧时间
+        else:
+            history.insert(0, system_msg)
 
         # 添加用户消息（支持图片）
         history.append({"role": "user", "content": self._build_user_content(message)})
@@ -436,9 +441,16 @@ class ChatService:
     def chat_stream(self, message: str, session_id: Optional[str] = None, persona: str = ""):
         """流式对话：生成器逐条产出 SSE 格式字符串。会话持久化到 DB。"""
         sid, history = self.session_svc.get_or_create(session_id)
+
+        # 始终刷新 system prompt 中的当前时间
+        persona_prompt = _get_persona_prompt(persona)
+        system_msg = {"role": "system", "content": _build_system_prompt(persona_prompt, self._time_anchor)}
         if not history:
-            persona_prompt = _get_persona_prompt(persona)
-            history.append({"role": "system", "content": _build_system_prompt(persona_prompt, self._time_anchor)})
+            history.append(system_msg)
+        elif history[0].get("role") == "system":
+            history[0] = system_msg
+        else:
+            history.insert(0, system_msg)
         history.append({"role": "user", "content": self._build_user_content(message)})
 
         # 工具选择阶段
@@ -481,7 +493,7 @@ class ChatService:
                 }, ensure_ascii=False))
                 return
 
-            # 有工具调用
+            # 有工具调用 — 先执行非 create_bill 工具，收集待确认的 create_bill
             history.append({
                 "role": "assistant",
                 "content": msg.content,
@@ -498,6 +510,8 @@ class ChatService:
                 ],
             })
 
+            # 收集本批次所有 create_bill（确认模式下暂不执行）
+            pending_bills: list[dict] = []
             for tc in msg.tool_calls:
                 tool_name = tc.function.name
                 arguments = json.loads(tc.function.arguments)
@@ -506,34 +520,37 @@ class ChatService:
                     "arguments": arguments,
                 }, ensure_ascii=False))
 
-                # 二次确认模式：create_bill 暂停等待用户确认
                 if self._confirm_mode and tool_name == "create_bill":
-                    # 保存当前历史（含 assistant tool_calls 但不含 create_bill 结果）
-                    self.session_svc.save(sid, history, persona)
-                    yield self._sse("confirm_required", json.dumps({
+                    pending_bills.append({
                         "tool_name": tool_name,
                         "arguments": arguments,
                         "tool_call_id": tc.id,
-                    }, ensure_ascii=False))
-                    yield self._sse("done", json.dumps({
-                        "session_id": sid,
-                        "pending_confirmation": True,
+                    })
+                else:
+                    result_str = self._get_executor().execute(tool_name, arguments)
+                    tool_records.append({
                         "tool_name": tool_name,
                         "arguments": arguments,
-                    }, ensure_ascii=False))
-                    return  # 暂停流，等待用户确认
+                        "result": result_str[:500],
+                    })
+                    history.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": result_str,
+                    })
 
-                result_str = self._get_executor().execute(tool_name, arguments)
-                tool_records.append({
-                    "tool_name": tool_name,
-                    "arguments": arguments,
-                    "result": result_str[:500],
-                })
-                history.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": result_str,
-                })
+            # 有批量待确认的 create_bill → 统一发送确认请求
+            if pending_bills:
+                self.session_svc.save(sid, history, persona)
+                yield self._sse("confirm_required", json.dumps({
+                    "bills": pending_bills,
+                }, ensure_ascii=False))
+                yield self._sse("done", json.dumps({
+                    "session_id": sid,
+                    "pending_confirmation": True,
+                    "bills": pending_bills,
+                }, ensure_ascii=False))
+                return
 
         yield self._sse("error", "处理超时，请稍后重试")
         yield self._sse("done", json.dumps({
@@ -542,48 +559,65 @@ class ChatService:
         }, ensure_ascii=False))
 
     def resume_after_confirmation(self, session_id: str, action: str,
-                                  modified_arguments: dict = None):
-        """用户确认/取消后恢复对话流。
-        action='confirm': 执行 create_bill 并继续 LLM 对话。
-        action='reject': 跳过 create_bill 并继续 LLM 对话。
+                                  modified_arguments: list = None):
+        """用户确认/取消后恢复对话流（支持批量账单）。
+        action='confirm': 执行所有待确认的 create_bill 并继续 LLM 对话。
+        action='reject': 跳过所有待确认的 create_bill 并继续 LLM 对话。
+        modified_arguments: [{tool_call_id, ...fields}] 用户修改后的参数列表。
         """
         sid, history = self.session_svc.get_or_create(session_id)
 
-        # 找到最后一个含 create_bill 的 assistant tool_calls 消息
-        pending_tc_id = None
-        pending_args = None
+        # 收集最后一个 assistant 消息中所有待确认的 create_bill
+        pending_bills: list[dict] = []
         for msg in reversed(history):
             if msg.get("role") == "assistant" and msg.get("tool_calls"):
                 for tc in msg["tool_calls"]:
                     if tc["function"]["name"] == "create_bill":
-                        pending_tc_id = tc["id"]
-                        pending_args = json.loads(tc["function"]["arguments"])
-                        break
-                if pending_tc_id:
-                    break
+                        # 检查该 tool_call 是否已有 tool result（已执行过的跳过）
+                        already_done = any(
+                            h.get("role") == "tool" and h.get("tool_call_id") == tc["id"]
+                            for h in history
+                        )
+                        if not already_done:
+                            pending_bills.append({
+                                "tool_call_id": tc["id"],
+                                "arguments": json.loads(tc["function"]["arguments"]),
+                            })
+                if pending_bills:
+                    break  # 只处理最近一批
 
-        if not pending_tc_id:
+        if not pending_bills:
             yield self._sse("error", "未找到待确认的记账操作")
             yield self._sse("done", json.dumps({"session_id": sid, "error": "no pending confirmation"}))
             return
 
-        # 执行或跳过 create_bill
-        if action == "confirm":
-            args = modified_arguments if modified_arguments else pending_args
-            result_str = self._get_executor().execute("create_bill", args)
-        else:
-            result_str = json.dumps({
-                "status": "cancelled",
-                "message": "用户取消记账",
-            }, ensure_ascii=False)
+        # 构建修改参数索引 {tool_call_id: modified_args}
+        mod_index: dict[str, dict] = {}
+        if modified_arguments:
+            for item in modified_arguments:
+                tcid = item.get("tool_call_id")
+                if tcid:
+                    mod_index[tcid] = {k: v for k, v in item.items() if k != "tool_call_id"}
 
-        history.append({
-            "role": "tool",
-            "tool_call_id": pending_tc_id,
-            "content": result_str,
-        })
+        # 逐条执行或跳过
+        for bill in pending_bills:
+            tcid = bill["tool_call_id"]
+            if action == "confirm":
+                args = mod_index.get(tcid, bill["arguments"])
+                result_str = self._get_executor().execute("create_bill", args)
+            else:
+                result_str = json.dumps({
+                    "status": "cancelled",
+                    "message": "用户取消记账",
+                }, ensure_ascii=False)
 
-        # 继续 LLM 对话循环（与 chat_stream 后半部分相同）
+            history.append({
+                "role": "tool",
+                "tool_call_id": tcid,
+                "content": result_str,
+            })
+
+        # 继续 LLM 对话循环
         yield from self._continue_conversation(history, sid)
 
     def _continue_conversation(self, history: list[dict], sid: str):
@@ -623,7 +657,7 @@ class ChatService:
                 }, ensure_ascii=False))
                 return
 
-            # 有工具调用
+            # 有工具调用 — 批量收集 create_bill
             history.append({
                 "role": "assistant",
                 "content": msg.content,
@@ -640,6 +674,7 @@ class ChatService:
                 ],
             })
 
+            pending_bills: list[dict] = []
             for tc in msg.tool_calls:
                 tool_name = tc.function.name
                 arguments = json.loads(tc.function.arguments)
@@ -648,28 +683,31 @@ class ChatService:
                     "arguments": arguments,
                 }, ensure_ascii=False))
 
-                # 二次确认：如果 LLM 再次调用 create_bill，同样暂停
                 if self._confirm_mode and tool_name == "create_bill":
-                    self.session_svc.save(sid, history)
-                    yield self._sse("confirm_required", json.dumps({
+                    pending_bills.append({
                         "tool_name": tool_name,
                         "arguments": arguments,
                         "tool_call_id": tc.id,
-                    }, ensure_ascii=False))
-                    yield self._sse("done", json.dumps({
-                        "session_id": sid,
-                        "pending_confirmation": True,
-                        "tool_name": tool_name,
-                        "arguments": arguments,
-                    }, ensure_ascii=False))
-                    return
+                    })
+                else:
+                    result_str = self._get_executor().execute(tool_name, arguments)
+                    history.append({
+                        "role": "tool",
+                        "tool_call_id": tc.id,
+                        "content": result_str,
+                    })
 
-                result_str = self._get_executor().execute(tool_name, arguments)
-                history.append({
-                    "role": "tool",
-                    "tool_call_id": tc.id,
-                    "content": result_str,
-                })
+            if pending_bills:
+                self.session_svc.save(sid, history)
+                yield self._sse("confirm_required", json.dumps({
+                    "bills": pending_bills,
+                }, ensure_ascii=False))
+                yield self._sse("done", json.dumps({
+                    "session_id": sid,
+                    "pending_confirmation": True,
+                    "bills": pending_bills,
+                }, ensure_ascii=False))
+                return
 
         yield self._sse("error", "处理超时，请稍后重试")
         yield self._sse("done", json.dumps({

@@ -12,7 +12,7 @@ export interface ChatRequest {
 export interface ConfirmActionRequest {
   session_id: string;
   action: 'confirm' | 'reject';
-  modified_arguments?: Record<string, unknown>;
+  modified_arguments?: Record<string, unknown>[];
 }
 
 export interface ToolCallRecord {
@@ -36,11 +36,16 @@ export interface SSEEvent {
   data: string;
 }
 
-/** 确认请求信息（来自 confirm_required 事件） */
-export interface ConfirmRequired {
+/** 单条待确认账单 */
+export interface PendingBill {
   tool_name: string;
   arguments: Record<string, unknown>;
   tool_call_id: string;
+}
+
+/** 确认请求信息（来自 confirm_required 事件，支持批量） */
+export interface ConfirmRequired {
+  bills: PendingBill[];
 }
 
 /** 对话消息（前端本地状态） */
@@ -50,7 +55,9 @@ export interface ChatMessage {
   toolCalls?: ToolCallRecord[];
   confirmData?: ConfirmRequired;
   timestamp: number;
-  /** 确认卡片状态 */
+  /** 确认卡片状态（批量时 bills[*] 各自维护） */
   confirmed?: boolean;
   rejected?: boolean;
+  /** 批量账单各自的确认/取消/编辑状态: { [tool_call_id]: { confirmed?, rejected?, editForm? } } */
+  billStates?: Record<string, { confirmed?: boolean; rejected?: boolean; editForm?: Record<string, string> }>;
 }

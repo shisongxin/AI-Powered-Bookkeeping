@@ -43,8 +43,7 @@ export default function ChatPage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [confirmMode, setConfirmMode] = useState(true);
   const [categories, setCategories] = useState<CategoryResponse[]>([]);
-  const [editingCardId, setEditingCardId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Record<string, string>>({});
+  // per-bill editing state now managed inside ConfirmCard component
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -87,11 +86,11 @@ export default function ChatPage() {
     appendAssistant(`\n\n❌ ${err.message}`); setStatusText(''); setLoading(false);
   };
 
-  // ---- Confirm / Reject ----
-  const handleConfirm = useCallback((cd: ConfirmRequired, modifiedArgs?: Record<string, unknown>) => {
+  // ---- Confirm / Reject (batch) ----
+  const handleConfirm = useCallback((cd: ConfirmRequired, modifiedArgs?: Record<string, unknown>[]) => {
     if (!sessionId) return;
-    setLoading(true); setStatusText('确认记账中...');
-    setMessages(p => p.map(m => m.role === 'confirm_card' && m.confirmData?.tool_call_id === cd.tool_call_id ? { ...m, confirmed: true, rejected: false } : m));
+    setLoading(true); setStatusText(`确认 ${cd.bills.length} 笔记账...`);
+    setMessages(p => p.map(m => m.role === 'confirm_card' ? { ...m, confirmed: true, rejected: false } : m));
     addMsg({ role: 'assistant', content: '', timestamp: Date.now() });
     streamCtrlRef.current = chatApi.confirmAction(
       { session_id: sessionId, action: 'confirm', modified_arguments: modifiedArgs },
@@ -102,7 +101,7 @@ export default function ChatPage() {
   const handleReject = useCallback((cd: ConfirmRequired) => {
     if (!sessionId) return;
     setLoading(true); setStatusText('取消中...');
-    setMessages(p => p.map(m => m.role === 'confirm_card' && m.confirmData?.tool_call_id === cd.tool_call_id ? { ...m, confirmed: false, rejected: true } : m));
+    setMessages(p => p.map(m => m.role === 'confirm_card' ? { ...m, confirmed: false, rejected: true } : m));
     addMsg({ role: 'assistant', content: '', timestamp: Date.now() });
     streamCtrlRef.current = chatApi.confirmAction(
       { session_id: sessionId, action: 'reject' },
@@ -192,7 +191,7 @@ export default function ChatPage() {
         )}
 
         {messages.map((msg, i) => {
-          if (msg.role === 'confirm_card') return <ConfirmCard key={i} msg={msg} categories={categories} editingCardId={editingCardId} editForm={editForm} setEditingCardId={setEditingCardId} setEditForm={setEditForm} onConfirm={handleConfirm} onReject={handleReject} />;
+          if (msg.role === 'confirm_card') return <ConfirmCard key={i} msg={msg} categories={categories} onConfirm={handleConfirm} onReject={handleReject} />;
           if (msg.role === 'tool_status') return null;
           const isUser = msg.role === 'user';
           if (!isUser && !msg.content) return null;
@@ -275,95 +274,133 @@ export default function ChatPage() {
 }
 
 /* ===== Confirm Card ===== */
-function ConfirmCard({ msg, categories, editingCardId, editForm, setEditingCardId, setEditForm, onConfirm, onReject }: {
-  msg: ChatMessage; categories: CategoryResponse[]; editingCardId: string | null;
-  editForm: Record<string, string>; setEditingCardId: (v: string | null) => void;
-  setEditForm: (v: Record<string, string>) => void;
-  onConfirm: (d: ConfirmRequired, m?: Record<string, unknown>) => void;
+function ConfirmCard({ msg, categories, onConfirm, onReject }: {
+  msg: ChatMessage; categories: CategoryResponse[];
+  onConfirm: (d: ConfirmRequired, m?: Record<string, unknown>[]) => void;
   onReject: (d: ConfirmRequired) => void;
 }) {
-  const args = msg.confirmData?.arguments; const tcId = msg.confirmData?.tool_call_id || '';
-  if (!args) return null;
-  const isEditing = editingCardId === tcId;
-  const displayArgs = isEditing ? { ...args, ...editForm } : args;
-  const amount = displayArgs.amount as number | undefined;
-  const isExpense = amount != null && amount < 0;
+  const bills = msg.confirmData?.bills;
+  if (!bills || bills.length === 0) return null;
 
+  // per-bill state: { [tcId]: { editing, editForm } }
+  const [states, setStates] = useState<Record<string, { editing: boolean; editForm: Record<string, string> }>>({});
+
+  const startEdit = (tcId: string, args: Record<string, unknown>) => {
+    setStates(p => ({ ...p, [tcId]: { editing: true, editForm: {
+      amount: String(args.amount ?? ''), category: String(args.category ?? ''),
+      payee: String(args.payee ?? ''), description: String(args.description ?? ''),
+      transaction_date: String(args.transaction_date ?? ''), payment_method: String(args.payment_method ?? ''),
+    }}}));
+  };
+  const cancelEdit = (tcId: string) => {
+    setStates(p => { const n = { ...p }; delete n[tcId]; return n; });
+  };
+  const updateField = (tcId: string, field: string, value: string) => {
+    setStates(p => ({ ...p, [tcId]: { ...p[tcId], editForm: { ...p[tcId]?.editForm, [field]: value } } }));
+  };
+
+  const handleConfirmAll = () => {
+    // Build modified_arguments array from per-bill edit forms
+    const modified: Record<string, unknown>[] = [];
+    for (const bill of bills) {
+      const st = states[bill.tool_call_id];
+      if (st?.editing && st.editForm) {
+        const m: Record<string, unknown> = { tool_call_id: bill.tool_call_id };
+        const a = parseFloat(st.editForm.amount);
+        if (!isNaN(a)) m.amount = a;
+        if (st.editForm.category) m.category = st.editForm.category;
+        if (st.editForm.payee) m.payee = st.editForm.payee;
+        if (st.editForm.description) m.description = st.editForm.description;
+        if (st.editForm.transaction_date) m.transaction_date = st.editForm.transaction_date;
+        if (st.editForm.payment_method) m.payment_method = st.editForm.payment_method;
+        modified.push(m);
+      }
+    }
+    onConfirm(msg.confirmData!, modified.length > 0 ? modified : undefined);
+  };
+
+  // Already confirmed or rejected
   if (msg.confirmed) return (
     <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-sm animate-scale-in">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-500"><polyline points="20 6 9 17 4 12"/></svg>
-      <span className="text-emerald-700 font-medium">已记账</span>
-      <span className="text-emerald-500 text-xs ml-auto">{String(args.payee || '')} {amount != null ? `${Math.abs(amount).toFixed(0)}元` : ''}</span>
+      <span>✅</span><span className="text-emerald-700 font-medium">已记账 {bills.length} 笔</span>
+      <span className="text-emerald-500 text-xs ml-auto">
+        {bills.map(b => String(b.arguments.payee || '')).filter(Boolean).join('、')}
+      </span>
     </div>
   );
   if (msg.rejected) return (
     <div className="flex items-center gap-2 px-4 py-2 bg-espresso-50 border border-espresso-100 rounded-xl text-sm animate-scale-in">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-espresso-400"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      <span className="text-espresso-500">已取消</span>
+      <span>❌</span><span className="text-espresso-500">已取消全部</span>
     </div>
   );
-
-  const startEdit = () => { setEditingCardId(tcId); setEditForm({ amount: String(args.amount ?? ''), category: String(args.category ?? ''), payee: String(args.payee ?? ''), description: String(args.description ?? ''), transaction_date: String(args.transaction_date ?? ''), payment_method: String(args.payment_method ?? '') }); };
-  const cancelEdit = () => { setEditingCardId(null); setEditForm({}); };
-  const confirmEdit = () => {
-    const m: Record<string, unknown> = {};
-    const a = parseFloat(editForm.amount); if (!isNaN(a)) m.amount = a;
-    if (editForm.category) m.category = editForm.category;
-    if (editForm.payee) m.payee = editForm.payee;
-    if (editForm.description) m.description = editForm.description;
-    if (editForm.transaction_date) m.transaction_date = editForm.transaction_date;
-    if (editForm.payment_method) m.payment_method = editForm.payment_method;
-    onConfirm(msg.confirmData!, m); setEditingCardId(null); setEditForm({});
-  };
 
   return (
     <div className="confirm-card animate-scale-in">
       <div className="flex items-center gap-2 mb-3">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold-600"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span className="font-semibold text-gold-800 text-sm">确认记账？</span>
-        <span className="text-xs text-gold-500 ml-auto">{isEditing ? '✏️ 修改中' : 'AI 生成'}</span>
+        <span className="font-semibold text-gold-800 text-sm">确认 {bills.length} 笔记账？</span>
+        <span className="text-xs text-gold-500 ml-auto">AI 生成</span>
       </div>
 
-      <div className="bg-white rounded-xl p-3 mb-3 space-y-1.5 text-sm border border-gold-100">
-        {isEditing ? (
-          <>
-            <EF label="金额" v={editForm.amount} onChange={v => setEditForm({ ...editForm, amount: v })} type="number" hint="支出为负" />
-            <div className="flex items-center gap-2"><span className="text-espresso-400 w-14 shrink-0 text-xs">分类</span>
-              <select value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })} className="flex-1 border border-espresso-200 rounded-lg px-2 py-1 text-sm bg-white">
-                <option value="">选择</option>
-                {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
+      {/* 每条账单一个卡片 */}
+      <div className="space-y-2 mb-3 max-h-[360px] overflow-y-auto">
+        {bills.map((bill, idx) => {
+          const tcId = bill.tool_call_id;
+          const st = states[tcId];
+          const isEditing = st?.editing;
+          const args = isEditing ? { ...bill.arguments, ...st.editForm } : bill.arguments;
+          const amount = args.amount as number | undefined;
+          const isExpense = amount != null && amount < 0;
+
+          return (
+            <div key={tcId} className="bg-white rounded-xl p-3 text-sm border border-gold-100">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-medium text-espresso-500">#{idx + 1}</span>
+                <span className={`text-xs font-bold ${isExpense ? 'text-coral-600' : 'text-emerald-600'}`}>
+                  {amount != null ? `${isExpense ? '−' : '+'}${Math.abs(amount).toFixed(2)} 元` : '?'}
+                </span>
+              </div>
+              {isEditing ? (
+                <div className="space-y-1">
+                  <div className="grid grid-cols-2 gap-1">
+                    <div><label className="text-[10px] text-espresso-400">金额</label>
+                      <input type="number" step="0.01" value={st.editForm.amount} onChange={e => updateField(tcId, 'amount', e.target.value)} className="w-full border border-espresso-200 rounded px-1.5 py-0.5 text-xs" /></div>
+                    <div><label className="text-[10px] text-espresso-400">分类</label>
+                      <select value={st.editForm.category} onChange={e => updateField(tcId, 'category', e.target.value)} className="w-full border border-espresso-200 rounded px-1.5 py-0.5 text-xs bg-white">
+                        <option value="">选择</option>
+                        {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      </select></div>
+                    <div><label className="text-[10px] text-espresso-400">商户</label>
+                      <input value={st.editForm.payee} onChange={e => updateField(tcId, 'payee', e.target.value)} className="w-full border border-espresso-200 rounded px-1.5 py-0.5 text-xs" /></div>
+                    <div><label className="text-[10px] text-espresso-400">描述</label>
+                      <input value={st.editForm.description} onChange={e => updateField(tcId, 'description', e.target.value)} className="w-full border border-espresso-200 rounded px-1.5 py-0.5 text-xs" /></div>
+                    <div><label className="text-[10px] text-espresso-400">日期</label>
+                      <input type="date" value={st.editForm.transaction_date} onChange={e => updateField(tcId, 'transaction_date', e.target.value)} className="w-full border border-espresso-200 rounded px-1.5 py-0.5 text-xs" /></div>
+                    <div><label className="text-[10px] text-espresso-400">支付</label>
+                      <input value={st.editForm.payment_method} onChange={e => updateField(tcId, 'payment_method', e.target.value)} className="w-full border border-espresso-200 rounded px-1.5 py-0.5 text-xs" /></div>
+                  </div>
+                  <button onClick={() => cancelEdit(tcId)} className="text-xs text-gold-600 hover:text-gold-700 mt-1">完成编辑</button>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  {args.payee ? <div className="text-espresso-700 font-medium">{String(args.payee)}</div> : null}
+                  <div className="flex flex-wrap gap-x-3 text-xs text-espresso-400">
+                    {args.category ? <span>{String(args.category)}</span> : null}
+                    {args.transaction_date ? <span>{String(args.transaction_date)}</span> : null}
+                    {args.description ? <span className="truncate max-w-[120px]">{String(args.description)}</span> : null}
+                  </div>
+                  <button onClick={() => startEdit(tcId, bill.arguments)} className="text-xs text-blue-500 hover:text-blue-600 mt-0.5">✏️ 编辑</button>
+                </div>
+              )}
             </div>
-            <EF label="商户" v={editForm.payee} onChange={v => setEditForm({ ...editForm, payee: v })} />
-            <EF label="描述" v={editForm.description} onChange={v => setEditForm({ ...editForm, description: v })} />
-            <EF label="日期" v={editForm.transaction_date} onChange={v => setEditForm({ ...editForm, transaction_date: v })} type="date" />
-            <EF label="支付" v={editForm.payment_method} onChange={v => setEditForm({ ...editForm, payment_method: v })} />
-          </>
-        ) : (
-          <>
-            <DRow label="金额" value={amount != null ? `${isExpense ? '−' : '+'}${Math.abs(amount).toFixed(2)} 元` : '未知'} emp />
-            {displayArgs.category ? <DRow label="分类" value={String(displayArgs.category)} /> : null}
-            {displayArgs.payee ? <DRow label="商户" value={String(displayArgs.payee)} /> : null}
-            {displayArgs.description ? <DRow label="描述" value={String(displayArgs.description)} /> : null}
-            {displayArgs.transaction_date ? <DRow label="日期" value={String(displayArgs.transaction_date)} /> : null}
-            {displayArgs.payment_method ? <DRow label="支付方式" value={String(displayArgs.payment_method)} /> : null}
-          </>
-        )}
+          );
+        })}
       </div>
 
+      {/* 操作按钮 */}
       <div className="flex gap-2">
-        {isEditing ? (
-          <>
-            <button onClick={confirmEdit} className="flex-1 btn-primary !bg-emerald-500 !from-emerald-500 !to-emerald-600 !shadow-none !text-sm">✅ 确认修改</button>
-            <button onClick={cancelEdit} className="btn-secondary flex-1 !text-sm justify-center">取消</button>
-          </>
-        ) : (
-          <>
-            <button onClick={() => onConfirm(msg.confirmData!)} className="flex-1 btn-primary !text-sm justify-center">✅ 确认</button>
-            <button onClick={startEdit} className="btn-secondary !text-sm">✏️ 修改</button>
-            <button onClick={() => onReject(msg.confirmData!)} className="btn-ghost !text-sm !text-espresso-400">取消</button>
-          </>
-        )}
+        <button onClick={handleConfirmAll} className="flex-1 btn-primary !text-sm justify-center">✅ 确认全部</button>
+        <button onClick={() => onReject(msg.confirmData!)} className="btn-ghost !text-sm !text-espresso-400">取消全部</button>
       </div>
     </div>
   );
