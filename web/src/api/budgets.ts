@@ -24,4 +24,7 @@ export const budgetsApi = {
 
   suggest: (year: number, month: number) =>
     client.get<BudgetSuggestionItem[]>('/budgets/suggest', { params: { year, month } }).then((r) => r.data),
+
+  autoGenerate: (year: number, month: number) =>
+    client.post<BudgetResponse[]>('/budgets/auto-generate', null, { params: { year, month } }).then((r) => r.data),
 };

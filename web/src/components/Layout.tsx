@@ -6,10 +6,9 @@ import { authApi } from '../api/auth';
 import type { UserResponse } from '../types/auth';
 
 const NAV_ITEMS = [
-  { to: '/',           icon: 'dashboard',  label: '仪表盘',     end: true },
+  { to: '/analysis',   icon: 'chart',      label: '流水分析' },
   { to: '/bills',      icon: 'receipt',    label: '账单明细' },
   { to: '/chat',       icon: 'chat',       label: 'AI 记账'  },
-  { to: '/analysis',   icon: 'chart',      label: '流水分析' },
   { to: '/categories', icon: 'category',   label: '分类管理' },
 ];
 
@@ -67,8 +66,7 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const isActive = (to: string, end?: boolean) => {
-    if (end) return location.pathname === to;
+  const isActive = (to: string) => {
     return location.pathname.startsWith(to);
   };
 
@@ -97,12 +95,11 @@ export default function Layout() {
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
-            const active = isActive(item.to, item.end);
+            const active = isActive(item.to);
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                end={item.end}
                 className={`nav-item ${active ? 'active' : ''} ${collapsed ? 'justify-center px-2' : ''}`}
                 title={collapsed ? item.label : undefined}
               >
@@ -162,8 +159,8 @@ export default function Layout() {
       </aside>
 
       {/* ===== Main Content ===== */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="page-enter">
+      <main className={`flex-1 ${location.pathname === '/chat' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <div className={`${location.pathname === '/chat' ? 'h-full' : 'page-enter'}`}>
           <Outlet />
         </div>
       </main>

@@ -230,5 +230,78 @@ class TestBudgetAPI:
         assert resp.status_code == 422
 
 
+class TestAutoGenerate:
+    def test_auto_generate_from_previous_month(self, db):
+        """基于上月消费数据自动生成当月预算"""
+        from app.services.bill_service import BillService
+        from app.services.budget_service import BudgetService
+        from app.schemas.bill import BillCreate
+
+        # 上月 (2026-05) 创建消费记录
+        bill_svc = BillService(db)
+        bill_svc.create_bill(BillCreate(amount=-500.0, category="餐饮",
+                                        transaction_date="2026-05-10 12:00:00"))
+        bill_svc.create_bill(BillCreate(amount=-300.0, category="交通",
+                                        transaction_date="2026-05-15 12:00:00"))
+
+        # 自动生成 2026-06 预算
+        budget_svc = BudgetService(db)
+        created = budget_svc.auto_generate(2026, 6)
+
+        assert len(created) == 2
+        categories = {b.category for b in created}
+        assert "餐饮" in categories
+        assert "交通" in categories
+
+        # 检查金额：餐饮 500 * 1.10 = 550
+        dining = [b for b in created if b.category == "餐饮"][0]
+        assert dining.amount == 550.0
+
+    def test_auto_generate_skips_existing(self, db):
+        """已有预算的分类不覆盖"""
+        from app.services.bill_service import BillService
+        from app.services.budget_service import BudgetService
+        from app.schemas.bill import BillCreate
+        from app.schemas.budget import BudgetCreate
+
+        bill_svc = BillService(db)
+        bill_svc.create_bill(BillCreate(amount=-500.0, category="餐饮",
+                                        transaction_date="2026-05-10 12:00:00"))
+
+        budget_svc = BudgetService(db)
+        # 手动设置餐饮预算
+        budget_svc.set_budget(BudgetCreate(year=2026, month=6, category="餐饮", amount=1000))
+
+        # 自动生成
+        created = budget_svc.auto_generate(2026, 6)
+        # 餐饮已有预算，不应被覆盖
+        categories = {b.category for b in created}
+        assert "餐饮" not in categories  # 已存在，跳过
+
+    def test_auto_generate_no_previous_data(self, db):
+        """上月无消费数据时返回空列表"""
+        from app.services.budget_service import BudgetService
+
+        budget_svc = BudgetService(db)
+        created = budget_svc.auto_generate(2026, 6)
+        assert created == []
+
+    def test_auto_generate_endpoint(self, api, db):
+        """API 端点测试"""
+        from app.services.bill_service import BillService
+        from app.schemas.bill import BillCreate
+
+        bill_svc = BillService(db)
+        bill_svc.create_bill(BillCreate(amount=-200.0, category="购物",
+                                        transaction_date="2026-05-20 12:00:00"))
+
+        resp = api.post("/api/v1/budgets/auto-generate?year=2026&month=6")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["category"] == "购物"
+        assert data[0]["amount"] == 220.0  # 200 * 1.10
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

@@ -142,6 +142,62 @@ class BudgetService:
             total_remaining=round(total_budget - total_actual, 2),
         )
 
+    # ---------- 自动生成预算 ----------
+
+    def auto_generate(self, year: int, month: int) -> list[Budget]:
+        """基于上月实际消费数据自动生成当月预算（上浮 10% 缓冲）。
+        若当月已有预算则跳过不覆盖；若上月无消费数据则返回空列表。
+        """
+        from datetime import date
+        import calendar
+
+        # 计算上月
+        prev_month = month - 1
+        prev_year = year
+        if prev_month <= 0:
+            prev_month += 12
+            prev_year -= 1
+
+        # 获取上月支出分类数据
+        stats_svc = StatisticsService(self.db)
+        last_day = calendar.monthrange(prev_year, prev_month)[1]
+        breakdown = stats_svc.category_breakdown(
+            start_date=date(prev_year, prev_month, 1),
+            end_date=date(prev_year, prev_month, last_day),
+            direction="支出",
+        )
+
+        if not breakdown:
+            logger.info(f"上月 ({prev_year}-{prev_month:02d}) 无消费数据，无法自动生成预算")
+            return []
+
+        # 获取当月已有预算（不覆盖）
+        existing = {b.category for b in self.get_budgets(year, month)}
+        created: list[Budget] = []
+
+        for item in breakdown:
+            if item.category in existing:
+                continue  # 已有预算，跳过
+
+            suggested = round(item.amount * 1.10, 2)  # 上浮 10% 缓冲
+            budget = Budget(
+                year=year, month=month,
+                category=item.category,
+                amount=suggested,
+                note=f"基于上月 ({prev_year}-{prev_month:02d}) 消费 {item.amount:.0f} 元自动生成",
+            )
+            self.db.add(budget)
+            created.append(budget)
+            existing.add(item.category)
+
+        if created:
+            self.db.commit()
+            for b in created:
+                self.db.refresh(b)
+            logger.info(f"自动生成 {len(created)} 条预算 ({year}-{month:02d})")
+
+        return created
+
     # ---------- AI 预算建议 ----------
 
     def suggest_budget(self, year: int, month: int,

@@ -174,8 +174,8 @@ export default function ChatPage() {
         </div>
       </header>
 
-      {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+      {/* Messages — 独占剩余空间，内部滚动 */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto py-6 px-4 space-y-2 min-h-0">
         {messages.length === 0 && (
           <div className="text-center mt-24 animate-fade-in">
             <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold-lg">

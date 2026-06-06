@@ -276,6 +276,7 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | DELETE | `/api/v1/budgets/{id}` | 删除预算 |
 | GET | `/api/v1/budgets/vs-actual?year=&month=` | 预算 vs 实际对比 |
 | GET | `/api/v1/budgets/suggest?year=&month=` | AI 预算建议 |
+| POST | `/api/v1/budgets/auto-generate?year=&month=` | 基于上月消费自动生成预算（上浮10%） |
 
 ## 默认分类
 
@@ -379,7 +380,12 @@ curl "http://localhost:8000/api/v1/budgets/vs-actual?year=2026&month=6"
 # AI 建议
 curl "http://localhost:8000/api/v1/budgets/suggest?year=2026&month=7"
 # → [{"category":"餐饮","suggested_amount":3300.0,"reason":"月均3000，上浮10%缓冲"},...]
+
+# 自动生成预算（基于上月消费数据，上浮 10%）
+curl -X POST "http://localhost:8000/api/v1/budgets/auto-generate?year=2026&month=6"
+# → [{"id":1,"year":2026,"month":6,"category":"餐饮","amount":550.0,...}]
 ```
+**自动生成逻辑**：分析上月各分类实际支出 → 上浮 10% 作为缓冲 → 跳过已有预算的分类 → 批量入库。上月无消费数据时返回空列表。前端 Analysis 页面提供「⚡ 智能生成」按钮一键触发。
 
 ## AI 对话记账
 
