@@ -2,10 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { chatApi } from '../api/chat';
 import { ocrApi } from '../api/ocr';
 import { categoriesApi } from '../api/categories';
-import type { ChatMessage, SSEEvent, ConfirmRequired } from '../types/chat';
+import ContentBlockRenderer from '../components/ContentBlockRenderer';
+import type { ChatMessage, SSEEvent, ConfirmRequired, ContentBlock } from '../types/chat';
 import type { OCRResponse, ExtractedItem } from '../types/ocr';
 import type { CategoryResponse } from '../types/category';
 
@@ -28,6 +30,78 @@ const PERSONAS = [
   { value: 'analyst', label: '📊 财务分析师' },
   { value: 'homie',   label: '🤝 老铁兄弟' },
 ];
+
+/** ReactMarkdown 组件映射 — 完整支持表格/标题/列表/引用/代码块 */
+const MARKDOWN_COMPONENTS: Record<string, React.FC<any>> = {
+  // 标题
+  h1: ({ children }) => <h1 className="text-lg font-bold text-espresso-800 mt-3 mb-2">{children}</h1>,
+  h2: ({ children }) => <h2 className="text-base font-bold text-espresso-800 mt-3 mb-2 border-b border-espresso-100 pb-1">{children}</h2>,
+  h3: ({ children }) => <h3 className="text-sm font-semibold text-espresso-700 mt-2 mb-1.5">{children}</h3>,
+  h4: ({ children }) => <h4 className="text-sm font-semibold text-espresso-600 mt-2 mb-1">{children}</h4>,
+  h5: ({ children }) => <h5 className="text-xs font-semibold text-espresso-600 mt-1.5 mb-1">{children}</h5>,
+  h6: ({ children }) => <h6 className="text-xs font-medium text-espresso-500 mt-1.5 mb-1">{children}</h6>,
+  // 段落
+  p: ({ children }) => <p className="mb-1.5 last:mb-0 leading-relaxed">{children}</p>,
+  // 内联代码
+  code: ({ className, children }) => {
+    const isInline = !className;
+    return isInline
+      ? <code className="bg-gold-100 text-gold-800 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
+      : <code className="block bg-espresso-800 text-emerald-400 p-3 rounded-xl text-xs font-mono overflow-x-auto my-2">{children}</code>;
+  },
+  // 代码块
+  pre: ({ children }) => <pre className="bg-espresso-800 text-emerald-400 p-3 rounded-xl text-xs font-mono overflow-x-auto my-2">{children}</pre>,
+  // 表格
+  table: ({ children }) => (
+    <div className="overflow-x-auto my-2 rounded-xl border border-espresso-100">
+      <table className="w-full text-xs border-collapse">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead className="bg-espresso-50">{children}</thead>,
+  tbody: ({ children }) => <tbody className="divide-y divide-espresso-50">{children}</tbody>,
+  tr: ({ children }) => <tr>{children}</tr>,
+  th: ({ children }) => <th className="px-3 py-2 text-left font-semibold text-espresso-600 text-[11px] uppercase tracking-wider border-b border-espresso-100">{children}</th>,
+  td: ({ children }) => <td className="px-3 py-2 text-espresso-700 whitespace-nowrap">{children}</td>,
+  // 列表
+  ul: ({ children }) => <ul className="list-disc pl-5 my-1.5 space-y-0.5 text-sm">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-5 my-1.5 space-y-0.5 text-sm">{children}</ol>,
+  li: ({ children }) => <li className="text-espresso-700">{children}</li>,
+  // 引用
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-3 border-gold-400 bg-gold-50/50 pl-3 py-2 my-2 rounded-r-lg text-sm text-espresso-600 italic">{children}</blockquote>
+  ),
+  // 强调
+  strong: ({ children }) => <strong className="font-semibold text-espresso-800">{children}</strong>,
+  em: ({ children }) => <em className="italic text-espresso-600">{children}</em>,
+  // 链接
+  a: ({ href, children }) => <a href={href} target="_blank" rel="noopener noreferrer" className="text-gold-600 underline hover:text-gold-700">{children}</a>,
+  // 分割线
+  hr: () => <hr className="my-3 border-espresso-100" />,
+};
+
+/**
+ * 规范化 Markdown 内容 —— 修复 LLM 输出中常见的换行缺失：
+ * 将同一行内粘连的表格行拆分，并在表格前插入 GFM 要求的空行。
+ */
+function normalizeMarkdown(content: string): string {
+  if (!content) return content;
+
+  // 1. 拆分粘连的表格行：每个 |...| 单元格后跟空格和另一个 | 时插入 \n
+  //    匹配: | 内容 | 后跟空白和 | (非分隔行)
+  //    例如: "| 餐饮 | 347元 | | 购物 |" → "| 餐饮 | 347元 |\n| 购物 |"
+  let fixed = content.replace(/(\|[^|\n]+\|)\s+(?=\|[^-])/g, '$1\n');
+
+  // 2. 表格分隔行（|---|---|）后紧跟内容时补换行
+  //    例如: "|------|------| | 餐饮 |" → "|------|------|\n| 餐饮 |"
+  fixed = fixed.replace(/(\|[-\s|:]+\|)\s+(?=\|)/g, '$1\n');
+
+  // 3. 非 | 字符后紧跟 | (且 | 后跟非 - 字符 = 不是分隔行)
+  //    例如: "支出构成| 分类 |" → "支出构成\n\n| 分类 |"
+  //    只在 | 前字符不是 |, -, :, 空格时触发 (避免破坏表格分隔行)
+  fixed = fixed.replace(/([^|\-:\s\n])\|(?=[^-\n])/g, '$1\n\n|');
+
+  return fixed;
+}
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -77,7 +151,27 @@ export default function ChatPage() {
         catch { /* */ }
         break;
       }
+      
       case 'reply_chunk': setStatusText(''); appendAssistant(evt.data); break;
+      case 'content_block': {
+        setStatusText('');
+        try {
+          const block = JSON.parse(evt.data) as ContentBlock;
+          setMessages(prev => {
+            let idx = prev.length - 1;
+            while (idx >= 0 && prev[idx].role !== 'assistant') idx--;
+            if (idx >= 0) {
+              const target = prev[idx];
+              return [...prev.slice(0, idx), {
+                ...target,
+                blocks: [...(target.blocks || []), block],
+              }, ...prev.slice(idx + 1)];
+            }
+            return [...prev, { role: 'assistant', content: '', blocks: [block], timestamp: Date.now() }];
+          });
+        } catch { /* */ }
+        break;
+      }
       case 'done': try { const d = JSON.parse(evt.data); if (d.session_id) setSessionId(d.session_id); } catch { /* */ } break;
       case 'error': appendAssistant(`\n\n❌ ${evt.data}`); break;
     }
@@ -208,9 +302,15 @@ export default function ChatPage() {
               </div>
               <div className={`max-w-[78%] ${isUser ? 'chat-bubble-user' : 'chat-bubble-ai'}`}>
                 {isUser ? <p className="whitespace-pre-wrap">{msg.content}</p> : (
-                  <ReactMarkdown components={{ p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>, code: ({ children }) => <code className="bg-gold-100 text-gold-800 px-1.5 py-0.5 rounded text-xs">{children}</code> }}>
-                    {msg.content || '…'}
-                  </ReactMarkdown>
+                  msg.blocks && msg.blocks.length > 0 ? (
+                    <div className="space-y-0.5">
+                      {msg.blocks.map((block, bi) => <ContentBlockRenderer key={bi} block={block} />)}
+                    </div>
+                  ) : (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                      {normalizeMarkdown(msg.content) || '…'}
+                    </ReactMarkdown>
+                  )
                 )}
               </div>
             </div>

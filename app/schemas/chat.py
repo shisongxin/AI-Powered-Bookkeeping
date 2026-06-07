@@ -34,3 +34,70 @@ class ChatResponse(BaseModel):
     session_id: Optional[str] = Field(None, description="当前会话 ID")
     tool_calls: List[ToolCallRecord] = Field(default_factory=list, description="本轮调用的工具列表")
     done: bool = Field(True, description="是否已完成本轮对话")
+
+
+# ============ 结构化内容块 ============
+
+class ContentBlock(BaseModel):
+    type: str = Field(...)
+
+
+class TextBlock(ContentBlock):
+    type: str = "text"
+    content: str = Field(...)
+
+
+class HeadingBlock(ContentBlock):
+    type: str = "heading"
+    level: int = Field(2, ge=1, le=3)
+    content: str = Field(...)
+
+
+class SummaryCardItem(BaseModel):
+    label: str = Field(...)
+    value: str = Field(...)
+    trend: Optional[str] = Field(None)
+
+
+class SummaryBlock(ContentBlock):
+    type: str = "summary"
+    cards: List[SummaryCardItem] = Field(...)
+
+
+class TableBlock(ContentBlock):
+    type: str = "table"
+    headers: List[str] = Field(...)
+    rows: List[List[str]] = Field(...)
+
+
+class BillListItem(BaseModel):
+    date: str = Field("")
+    category: str = Field("")
+    payee: str = Field("")
+    amount: str = Field("")
+
+
+class BillListBlock(ContentBlock):
+    type: str = "bill_list"
+    bills: List[BillListItem] = Field(...)
+
+
+class CalloutBlock(ContentBlock):
+    type: str = "callout"
+    level: str = Field("info")
+    content: str = Field(...)
+
+
+class DividerBlock(ContentBlock):
+    type: str = "divider"
+
+
+BLOCK_CLASS_MAP: dict[str, type[ContentBlock]] = {
+    "text": TextBlock,
+    "heading": HeadingBlock,
+    "table": TableBlock,
+    "summary": SummaryBlock,
+    "bill_list": BillListBlock,
+    "callout": CalloutBlock,
+    "divider": DividerBlock,
+}

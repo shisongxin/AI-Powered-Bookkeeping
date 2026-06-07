@@ -29,7 +29,7 @@ export interface ChatResponse {
 }
 
 /** SSE 事件类型 */
-export type SSEEventType = 'status' | 'tool_call' | 'confirm_required' | 'reply_chunk' | 'done' | 'error';
+export type SSEEventType = 'status' | 'tool_call' | 'confirm_required' | 'reply_chunk' | 'content_block' | 'done' | 'error';
 
 export interface SSEEvent {
   event: SSEEventType;
@@ -48,16 +48,32 @@ export interface ConfirmRequired {
   bills: PendingBill[];
 }
 
+// ============ ContentBlock 类型（结构化渲染）============
+
+export type ContentBlockType = 'text' | 'heading' | 'table' | 'summary' | 'bill_list' | 'callout' | 'divider';
+
+export interface TextBlock { type: 'text'; content: string; }
+export interface HeadingBlock { type: 'heading'; level: 1 | 2 | 3; content: string; }
+export interface SummaryCardItem { label: string; value: string; trend?: 'up' | 'down' | 'flat'; }
+export interface SummaryBlock { type: 'summary'; cards: SummaryCardItem[]; }
+export interface TableBlock { type: 'table'; headers: string[]; rows: string[][]; }
+export interface BillListItem { date: string; category: string; payee: string; amount: string; }
+export interface BillListBlock { type: 'bill_list'; bills: BillListItem[]; }
+export interface CalloutBlock { type: 'callout'; level: 'info' | 'warning' | 'success'; content: string; }
+export interface DividerBlock { type: 'divider'; }
+
+export type ContentBlock = TextBlock | HeadingBlock | SummaryBlock | TableBlock | BillListBlock | CalloutBlock | DividerBlock;
+
 /** 对话消息（前端本地状态） */
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool_status' | 'confirm_card';
   content: string;
+  /** 结构化内容块（assistant 消息使用，由 content_block SSE 事件填充） */
+  blocks?: ContentBlock[];
   toolCalls?: ToolCallRecord[];
   confirmData?: ConfirmRequired;
   timestamp: number;
-  /** 确认卡片状态（批量时 bills[*] 各自维护） */
   confirmed?: boolean;
   rejected?: boolean;
-  /** 批量账单各自的确认/取消/编辑状态: { [tool_call_id]: { confirmed?, rejected?, editForm? } } */
   billStates?: Record<string, { confirmed?: boolean; rejected?: boolean; editForm?: Record<string, string> }>;
 }

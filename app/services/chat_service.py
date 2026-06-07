@@ -44,11 +44,18 @@ def _build_system_prompt(persona_prompt: str = "", time_str: Optional[str] = Non
 当前时间: {today_str}（{weekday}） 本月: {month_str}
 
 ## 规则
+
 - 金额: 支出负数、收入正数。日期: YYYY-MM-DD
 - 用户说"今天/本月"等词时，用上方当前时间推算具体日期
 - 记账前不确定分类名时先调 list_categories
 - 收到账单截图时，先调 scan_receipt 提取交易，再逐条调 create_bill 入库
 - 回复简短、口语化，金额带"元"
+
+## 回复格式
+- 日常对话、简单回复 → Markdown
+- 统计数据/表格/汇总 → JSON 内容块数组:
+[{{"type":"heading","level":2,"content":"标题"}},{{"type":"summary","cards":[{{"label":"支出","value":"674元"}}]}},{{"type":"table","headers":["分类","金额"],"rows":[["餐饮","347元"]]}},{{"type":"bill_list","bills":[{{"date":"06-01","category":"餐饮","payee":"麦当劳","amount":"-35.00"}}]}},{{"type":"callout","level":"warning","content":"提示"}},{{"type":"text","content":"分析说明"}},{{"type":"divider"}}]
+JSON 数组必须是全部回复，不要混入其他文字。
 {persona_prompt}"""
     return base
 
@@ -482,9 +489,15 @@ class ChatService:
                     delta = chunk.choices[0].delta
                     if delta.content:
                         full_reply += delta.content
-                        yield self._sse("reply_chunk", delta.content)
+                # 混合路由：优先 JSON 内容块，回退 Markdown
+                blocks = self._parse_content_blocks(full_reply)
+                has_structured = any(b['type'] != 'text' for b in blocks)
+                if has_structured:
+                    for block in blocks:
+                        yield self._sse("content_block", json.dumps(block, ensure_ascii=False))
+                else:
+                    yield self._sse("reply_chunk", full_reply)
                 history.append({"role": "assistant", "content": full_reply})
-                # 修剪并持久化
                 _prune_history(history, keep_recent=settings.CHAT_KEEP_RECENT_ROUNDS + 5)
                 self.session_svc.save(sid, history, persona)
                 yield self._sse("done", json.dumps({
@@ -647,7 +660,14 @@ class ChatService:
                     delta = chunk.choices[0].delta
                     if delta.content:
                         full_reply += delta.content
-                        yield self._sse("reply_chunk", delta.content)
+                # 混合路由：优先 JSON 内容块，回退 Markdown
+                blocks = self._parse_content_blocks(full_reply)
+                has_structured = any(b['type'] != 'text' for b in blocks)
+                if has_structured:
+                    for block in blocks:
+                        yield self._sse("content_block", json.dumps(block, ensure_ascii=False))
+                else:
+                    yield self._sse("reply_chunk", full_reply)
                 history.append({"role": "assistant", "content": full_reply})
                 _prune_history(history, keep_recent=settings.CHAT_KEEP_RECENT_ROUNDS + 5)
                 self.session_svc.save(sid, history)
@@ -715,6 +735,52 @@ class ChatService:
         }, ensure_ascii=False))
 
     @staticmethod
+    def _parse_content_blocks(raw: str) -> list[dict]:
+        """尝试将 LLM 回复解析为 JSON 内容块数组。
+        成功则返回块列表；失败则返回单个 text 块（触发 Markdown 回退）。
+        """
+        import re
+        from app.schemas.chat import BLOCK_CLASS_MAP
+
+        text = raw.strip()
+        m = re.search(r'```(?:json)?\s*(\[[\s\S]*?\])\s*```', text)
+        if m:
+            text = m.group(1).strip()
+        m = re.search(r'\[[\s\S]*\]', text)
+        if m:
+            try:
+                raw_blocks = json.loads(m.group(0))
+                if isinstance(raw_blocks, list):
+                    result = []
+                    for item in raw_blocks:
+                        if not isinstance(item, dict) or 'type' not in item:
+                            continue
+                        model_cls = BLOCK_CLASS_MAP.get(item.get('type', ''))
+                        if model_cls is None:
+                            continue
+                        try:
+                            result.append(model_cls(**item).model_dump())
+                        except Exception:
+                            continue
+                    if result:
+                        return result
+            except (json.JSONDecodeError, Exception):
+                pass
+        # Markdown 回退
+        return [{"type": "text", "content": raw.strip()}]
+
+    @staticmethod
     def _sse(event: str, data: str) -> str:
-        """构建一条 Server-Sent Event 格式字符串"""
-        return f"event: {event}\ndata: {data}\n\n"
+        """构建一条 Server-Sent Event 格式字符串。
+        将 data 内容按行拆分，每行前缀 data: ——避免 markdown 中的 \\n\\n
+        被前端 SSE 解析器误判为帧结束标志。
+        同时规范化 \\r\\n → \\n，确保跨平台换行一致。
+        """
+        # 规范化换行符：\r\n → \n，残留 \r → \n
+        normalized = data.replace("\r\n", "\n").replace("\r", "\n")
+        lines = normalized.split("\n")
+        payload = f"event: {event}\n"
+        for line in lines:
+            payload += f"data: {line}\n"
+        payload += "\n"
+        return payload
