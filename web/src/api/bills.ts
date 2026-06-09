@@ -23,4 +23,7 @@ export const billsApi = {
 
   search: (params: BillSearchParams) =>
     client.get<BillResponse[]>('/bills/search', { params }).then((r) => r.data),
+
+  delete: (id: number) =>
+    client.delete<{ success: boolean; message: string }>(`/bills/${id}`).then((r) => r.data),
 };

@@ -13,6 +13,8 @@ export interface ConfirmActionRequest {
   session_id: string;
   action: 'confirm' | 'reject';
   modified_arguments?: Record<string, unknown>[];
+  /** 要单独拒绝的 tool_call_id 列表（批量中移除个别账单） */
+  reject_ids?: string[];
 }
 
 export interface ToolCallRecord {

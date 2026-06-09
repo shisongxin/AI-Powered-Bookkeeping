@@ -100,6 +100,11 @@ export default function Bills() {
     try { await billsApi.update(editingBillId, d); cancelEdit(); loadBills(); } catch { /* */ }
   };
 
+  const handleDeleteBill = async (id: number, label: string) => {
+    if (!confirm(`确定删除「${label}」吗？此操作不可撤销。`)) return;
+    try { await billsApi.delete(id); loadBills(); } catch { /* */ }
+  };
+
   const renderRow = (b: BillResponse) => {
     if (editingBillId === b.id) {
       return (
@@ -121,7 +126,10 @@ export default function Bills() {
         <td className="px-3 py-3 text-espresso-400 text-xs max-w-[140px] truncate hidden md:table-cell">{b.description || b.remark || ''}</td>
         <td className={`px-3 py-3 text-right font-semibold text-sm tabular-nums whitespace-nowrap ${b.amount < 0 ? 'text-coral-600' : 'text-emerald-600'}`}>{fmt(b.amount)}</td>
         <td className="px-3 py-3 text-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => startEdit(b)} className="px-2.5 py-1 text-xs text-gold-700 hover:bg-gold-100 rounded-lg transition-colors font-medium">编辑</button>
+          <div className="flex items-center justify-center gap-1">
+            <button onClick={() => startEdit(b)} className="px-2.5 py-1 text-xs text-gold-700 hover:bg-gold-100 rounded-lg transition-colors font-medium">编辑</button>
+            <button onClick={() => handleDeleteBill(b.id, b.payee || b.description || '未命名')} className="px-2.5 py-1 text-xs text-coral-600 hover:bg-coral-50 rounded-lg transition-colors font-medium">删除</button>
+          </div>
         </td>
       </tr>
     );

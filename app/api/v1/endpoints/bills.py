@@ -22,7 +22,7 @@ def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
 
 @router.get("/", response_model=list[BillResponse])
 def get_bills(skip: int = 0, limit: int = 100, order: str = "desc", db: Session = Depends(get_db)):
-    """获取账单列表，默认按创建时间倒序（最新在前）。order=asc 可切换为正序"""
+    """获取账单列表，默认按时间倒序（最新在前）。order=asc 可切换为正序"""
     service = BillService(db)
     return service.get_bills(skip=skip, limit=limit, order=order)
 
@@ -108,6 +108,16 @@ def update_bill(bill_id: int, data: BillUpdate, db: Session = Depends(get_db)):
     if not bill:
         raise HTTPException(status_code=404, detail="账单不存在")
     return bill
+
+
+@router.delete("/{bill_id}")
+def delete_bill(bill_id: int, db: Session = Depends(get_db)):
+    """删除指定账单"""
+    service = BillService(db)
+    ok = service.delete_bill(bill_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="账单不存在")
+    return {"success": True, "message": f"账单 {bill_id} 已删除"}
 
 
 @router.get("/search", response_model=list[BillResponse])

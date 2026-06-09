@@ -572,11 +572,13 @@ class ChatService:
         }, ensure_ascii=False))
 
     def resume_after_confirmation(self, session_id: str, action: str,
-                                  modified_arguments: list = None):
-        """用户确认/取消后恢复对话流（支持批量账单）。
-        action='confirm': 执行所有待确认的 create_bill 并继续 LLM 对话。
-        action='reject': 跳过所有待确认的 create_bill 并继续 LLM 对话。
+                                  modified_arguments: list = None,
+                                  reject_ids: list = None):
+        """用户确认/取消后恢复对话流（支持批量账单 + 逐条拒绝）。
+        action='confirm': 执行待确认的 create_bill，reject_ids 中的除外。
+        action='reject': 跳过所有待确认的 create_bill。
         modified_arguments: [{tool_call_id, ...fields}] 用户修改后的参数列表。
+        reject_ids: 要单独拒绝的 tool_call_id 列表。
         """
         sid, history = self.session_svc.get_or_create(session_id)
 
@@ -612,17 +614,20 @@ class ChatService:
                 if tcid:
                     mod_index[tcid] = {k: v for k, v in item.items() if k != "tool_call_id"}
 
+        # 拒绝名单
+        skip_ids = set(reject_ids or [])
+
         # 逐条执行或跳过
         for bill in pending_bills:
             tcid = bill["tool_call_id"]
-            if action == "confirm":
-                args = mod_index.get(tcid, bill["arguments"])
-                result_str = self._get_executor().execute("create_bill", args)
-            else:
+            if action == "reject" or tcid in skip_ids:
                 result_str = json.dumps({
                     "status": "cancelled",
                     "message": "用户取消记账",
                 }, ensure_ascii=False)
+            else:
+                args = mod_index.get(tcid, bill["arguments"])
+                result_str = self._get_executor().execute("create_bill", args)
 
             history.append({
                 "role": "tool",

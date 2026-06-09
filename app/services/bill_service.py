@@ -38,12 +38,12 @@ class BillService:
         return db_bill
 
     def get_bills(self, skip: int = 0, limit: int = 100, order: str = "desc"):
-        """获取账单列表，默认按创建时间倒序（最新在前）"""
+        """获取账单列表，默认按时间倒序（最新在前）"""
         q = self.db.query(Bill)
         if order == "asc":
-            q = q.order_by(Bill.created_at.asc())
+            q = q.order_by(Bill.transaction_date.asc().nullsfirst())
         else:
-            q = q.order_by(Bill.created_at.desc())
+            q = q.order_by(Bill.transaction_date.desc().nullslast())
         return q.offset(skip).limit(limit).all()
 
     def update_bill(self, bill_id: int, data: BillUpdate) -> Optional[Bill]:
@@ -60,6 +60,16 @@ class BillService:
         self.db.commit()
         self.db.refresh(bill)
         return bill
+
+    def delete_bill(self, bill_id: int) -> bool:
+        """删除指定账单，返回是否成功"""
+        bill = self.db.query(Bill).filter(Bill.id == bill_id).first()
+        if not bill:
+            return False
+        self.db.delete(bill)
+        self.db.commit()
+        logger.info(f"账单已删除: id={bill_id}")
+        return True
 
     def search_bills(self, keyword: str = "", start_date: str = "",
                      end_date: str = "", category: str = "",
@@ -92,7 +102,7 @@ class BillService:
         if category:
             q = q.filter(Bill.category == category)
 
-        return q.order_by(Bill.created_at.desc()).offset(skip).limit(limit).all()
+        return q.order_by(Bill.transaction_date.desc().nullslast()).offset(skip).limit(limit).all()
 
     def _auto_categorize(self, rec: FlexibleBillRecord) -> tuple[str, Optional[int]]:
         """自动匹配分类，返回 (分类名, 分类ID)。匹配不到则使用 其他（兜底分类）。"""

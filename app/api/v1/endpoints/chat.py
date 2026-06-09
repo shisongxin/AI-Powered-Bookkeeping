@@ -71,6 +71,7 @@ def confirm_action(request: ConfirmActionRequest, db: Session = Depends(get_db))
             request.session_id,
             request.action,
             request.modified_arguments,
+            request.reject_ids,
         ),
         media_type="text/event-stream",
         headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},

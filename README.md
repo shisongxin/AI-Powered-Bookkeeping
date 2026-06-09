@@ -258,6 +258,7 @@ curl "http://localhost:8000/api/v1/statistics/trend?start_date=2026-01-01&end_da
 | POST | `/api/v1/bills/` | 手动创建单条账单 |
 | GET | `/api/v1/bills/` | 分页查询账单列表（时间倒序） |
 | PUT | `/api/v1/bills/{id}` | 更新账单（部分字段） |
+| DELETE | `/api/v1/bills/{id}` | 删除账单 |
 | GET | `/api/v1/bills/search?keyword=&category=&start_date=&end_date=` | 搜索账单（关键词/分类/日期） |
 | POST | `/api/v1/bills/upload` | 上传文件自动解析导入 |
 | POST | `/api/v1/categories/` | 创建分类 |
@@ -579,6 +580,7 @@ LLM 回复 → _parse_content_blocks() → 判断内容类型
 - [x] **预算自动生成** — 基于上月消费自动生成当月预算（上浮 10%）
 - [x] **前端 UI 升级** — Warm Ledger 主题（暖金+深咖啡+玻璃拟态）
 - [x] **PaddleOCR 本地引擎** — 免费离线 OCR，精准提取金额/商户/日期/分类，不可用时自动回退 Vision LLM
+- [x] **账单删除** — 后端 DELETE API + 前端账单明细行删除 + AI 记账批量确认中逐条忽略
 - [ ] 语音记账 — Whisper API 语音转文字
 - [ ] Docker 部署 — docker-compose 一键启动
 - [ ] App 前端 — React Native / Flutter

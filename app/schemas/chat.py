@@ -15,10 +15,11 @@ class ChatRequest(BaseModel):
 
 
 class ConfirmActionRequest(BaseModel):
-    """用户对待确认操作的响应（支持批量账单）"""
+    """用户对待确认操作的响应（支持批量账单 + 逐条拒绝）"""
     session_id: str = Field(..., description="会话 ID")
     action: str = Field(..., description="confirm 或 reject")
     modified_arguments: Optional[list[dict]] = Field(None, description="用户修改后的账单参数列表 [{tool_call_id, ...fields}]，仅 confirm 时有效")
+    reject_ids: Optional[list[str]] = Field(None, description="要单独拒绝的 tool_call_id 列表（从批量中移除个别账单）")
 
 
 class ToolCallRecord(BaseModel):

@@ -181,13 +181,14 @@ export default function ChatPage() {
   };
 
   // ---- Confirm / Reject (batch) ----
-  const handleConfirm = useCallback((cd: ConfirmRequired, modifiedArgs?: Record<string, unknown>[]) => {
+  const handleConfirm = useCallback((cd: ConfirmRequired, modifiedArgs?: Record<string, unknown>[], rejectIds?: string[]) => {
     if (!sessionId) return;
-    setLoading(true); setStatusText(`确认 ${cd.bills.length} 笔记账...`);
+    const keepCount = cd.bills.length - (rejectIds?.length || 0);
+    setLoading(true); setStatusText(`确认 ${keepCount} 笔记账...`);
     setMessages(p => p.map(m => m.role === 'confirm_card' ? { ...m, confirmed: true, rejected: false } : m));
     addMsg({ role: 'assistant', content: '', timestamp: Date.now() });
     streamCtrlRef.current = chatApi.confirmAction(
-      { session_id: sessionId, action: 'confirm', modified_arguments: modifiedArgs },
+      { session_id: sessionId, action: 'confirm', modified_arguments: modifiedArgs, reject_ids: rejectIds },
       { onEvent: makeSSEHandler(), onError: makeErrorHandler(), onDone: (sid) => { if (sid) setSessionId(sid); setStatusText(''); setLoading(false); } }
     );
   }, [sessionId, addMsg, appendAssistant]);
@@ -376,7 +377,7 @@ export default function ChatPage() {
 /* ===== Confirm Card ===== */
 function ConfirmCard({ msg, categories, onConfirm, onReject }: {
   msg: ChatMessage; categories: CategoryResponse[];
-  onConfirm: (d: ConfirmRequired, m?: Record<string, unknown>[]) => void;
+  onConfirm: (d: ConfirmRequired, m?: Record<string, unknown>[], rejectIds?: string[]) => void;
   onReject: (d: ConfirmRequired) => void;
 }) {
   const bills = msg.confirmData?.bills;
@@ -384,6 +385,8 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
 
   // per-bill state: { [tcId]: { editing, editForm } }
   const [states, setStates] = useState<Record<string, { editing: boolean; editForm: Record<string, string> }>>({});
+  // 被逐条移除的账单
+  const [removed, setRemoved] = useState<Set<string>>(new Set());
 
   const startEdit = (tcId: string, args: Record<string, unknown>) => {
     setStates(p => ({ ...p, [tcId]: { editing: true, editForm: {
@@ -400,9 +403,15 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
   };
 
   const handleConfirmAll = () => {
-    // Build modified_arguments array from per-bill edit forms
+    // 如果全部被移除，等同于取消全部
+    if (removed.size >= bills.length) {
+      onReject(msg.confirmData!);
+      return;
+    }
+    // Build modified_arguments from per-bill edit forms (exclude removed)
     const modified: Record<string, unknown>[] = [];
     for (const bill of bills) {
+      if (removed.has(bill.tool_call_id)) continue;
       const st = states[bill.tool_call_id];
       if (st?.editing && st.editForm) {
         const m: Record<string, unknown> = { tool_call_id: bill.tool_call_id };
@@ -416,13 +425,13 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
         modified.push(m);
       }
     }
-    onConfirm(msg.confirmData!, modified.length > 0 ? modified : undefined);
+    onConfirm(msg.confirmData!, modified.length > 0 ? modified : undefined, Array.from(removed));
   };
 
   // Already confirmed or rejected
   if (msg.confirmed) return (
     <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-100 rounded-xl text-sm animate-scale-in">
-      <span>✅</span><span className="text-emerald-700 font-medium">已记账 {bills.length} 笔</span>
+      <span>✅</span><span className="text-emerald-700 font-medium">已记账 {bills.length - removed.size} 笔</span>
       <span className="text-emerald-500 text-xs ml-auto">
         {bills.map(b => String(b.arguments.payee || '')).filter(Boolean).join('、')}
       </span>
@@ -438,13 +447,16 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
     <div className="confirm-card animate-scale-in">
       <div className="flex items-center gap-2 mb-3">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gold-600"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span className="font-semibold text-gold-800 text-sm">确认 {bills.length} 笔记账？</span>
+        <span className="font-semibold text-gold-800 text-sm">
+          确认 {bills.length - removed.size} 笔记账？
+          {removed.size > 0 && <span className="text-coral-500 text-xs ml-1">(已忽略 {removed.size} 笔)</span>}
+        </span>
         <span className="text-xs text-gold-500 ml-auto">AI 生成</span>
       </div>
 
       {/* 每条账单一个卡片 */}
       <div className="space-y-2 mb-3 max-h-[360px] overflow-y-auto">
-        {bills.map((bill, idx) => {
+        {bills.filter(b => !removed.has(b.tool_call_id)).map((bill, idx) => {
           const tcId = bill.tool_call_id;
           const st = states[tcId];
           const isEditing = st?.editing;
@@ -456,9 +468,15 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
             <div key={tcId} className="bg-white rounded-xl p-3 text-sm border border-gold-100">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-medium text-espresso-500">#{idx + 1}</span>
-                <span className={`text-xs font-bold ${isExpense ? 'text-coral-600' : 'text-emerald-600'}`}>
-                  {amount != null ? `${isExpense ? '−' : '+'}${Math.abs(amount).toFixed(2)} 元` : '?'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); setRemoved(p => new Set([...p, tcId])); }}
+                    className="text-xs text-coral-500 hover:text-coral-700 hover:bg-coral-50 rounded px-1.5 py-0.5 transition-colors" title="从批量中移除此账单">
+                    ✕ 忽略
+                  </button>
+                  <span className={`text-xs font-bold ${isExpense ? 'text-coral-600' : 'text-emerald-600'}`}>
+                    {amount != null ? `${isExpense ? '−' : '+'}${Math.abs(amount).toFixed(2)} 元` : '?'}
+                  </span>
+                </div>
               </div>
               {isEditing ? (
                 <div className="space-y-1">
