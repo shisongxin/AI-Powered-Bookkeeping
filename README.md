@@ -163,7 +163,7 @@ npm run dev              # 启动开发服务器 → http://localhost:3000
 pytest tests/ -v
 ```
 
-当前 140 个测试用例，覆盖分类 CRUD、自动分类、账单导入/更新/搜索、统计查询、AI 对话、工具调用、流式输出、JSON 内容块解析、混合路由、批量确认、角色预设、会话持久化、用户认证、OCR 图片识别、月度预算等全部功能。
+当前 168 个测试用例（含 PaddleOCR 28 个提取逻辑测试），覆盖分类 CRUD、自动分类、账单导入/更新/搜索、统计查询、AI 对话、工具调用、流式输出、JSON 内容块解析、混合路由、批量确认、角色预设、会话持久化、用户认证、OCR 图片识别、月度预算等全部功能。
 
 ## 数据库迁移
 
@@ -327,26 +327,40 @@ curl "http://localhost:8000/api/v1/auth/me" \
 
 ### OCR 图片识别
 
-上传账单截图或收据照片，vision LLM 自动提取交易日期、金额、商户名等结构化数据。基于智谱 GLM-4V（可配置为 GPT-4o 等其他多模态模型）。
+双重引擎架构：优先使用 **PaddleOCR** 本地引擎（免费、精准），不可用时自动回退到 **Vision LLM**（智谱 GLM-4V / GPT-4o）。
+
+| 引擎 | 原理 | 优势 | 限制 |
+|---|---|---|---|
+| PaddleOCR | 本地 OCR 模型 → 文本检测 → 正则提取 | 免费、离线、精准 | 需安装 `paddlepaddle` |
+| Vision LLM | 多模态大模型 → JSON 结构化输出 | 理解力强、无需安装 | 需 API Key |
+
+**提取能力**：金额（¥/-符号/元后缀）、商户名（OCR 位置推断）、日期（完整/短格式）、分类（关键词匹配）、支付方式（微信/支付宝/银行卡）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/v1/ocr/recognize` | 上传图片，返回提取的交易列表 |
+| POST | `/api/v1/ocr/recognize` | 上传图片（PNG/JPG/WebP，≤10MB），返回结构化交易列表 |
 
 ```bash
-# 上传收据图片
+# 上传收据图片（自动选择引擎）
 curl -X POST "http://localhost:8000/api/v1/ocr/recognize" \
   -F "file=@receipt.jpg"
-# → {"success":true,"items":[{"payee":"麦当劳","amount":-35.0,...}]}
+# → {"success":true,"items":[{"payee":"麦当劳","amount":-35.0,"category":"餐饮",...}]}
 ```
 
-**模型选择**：通过 `.env` 配置 `VISION_MODEL` 切换多模态模型：
+**安装 PaddleOCR**（推荐，获得最佳识别效果）：
+```bash
+# 推荐稳定版本（Windows/Linux 均可用）
+pip install paddlepaddle==2.6.2 paddleocr==2.7.3 "numpy<2"
+```
+> ⚠️ PaddleOCR 3.x + PaddlePaddle 3.x 在 Windows 上存在 OneDNN/PIR 兼容性问题（`ConvertPirAttribute2RuntimeAttribute`），请使用上述 2.x 版本。
+
+**Vision LLM 配置**（PaddleOCR 不可用时的回退方案）：
 ```env
-VISION_MODEL=glm-4v        # 智谱 GLM-4V（默认，推荐中文场景）
-# VISION_MODEL=gpt-4o      # OpenAI GPT-4o（需切换 OPENAI_BASE_URL）
+VISION_MODEL=glm-4v        # 智谱 GLM-4V（默认）
+# VISION_MODEL=gpt-4o      # OpenAI GPT-4o
+OPENAI_API_KEY=sk-xxx      # 必须配置
+OPENAI_BASE_URL=https://api.openai.com/v1
 ```
-
-支持的图片格式：PNG / JPG / WebP，最大 10MB，自动压缩大图。
 
 **Chat 集成**：通过 ChatRequest 的 `image_base64` 字段，可直接在对话中上传图片，LLM 自动完成"OCR 识别 → 逐条记账"全链路（Tool Chaining）：
 ```bash
@@ -563,7 +577,8 @@ LLM 回复 → _parse_content_blocks() → 判断内容类型
 - [x] **会话持久化** — 切换页面保留对话（localStorage）+ 后端 TTL 7天
 - [x] **实时时间注入** — 每次对话刷新 system prompt 日期
 - [x] **预算自动生成** — 基于上月消费自动生成当月预算（上浮 10%）
-- [x] **前端 UI 升级** — Warm Prosperity 主题（暖金+深咖啡+玻璃拟态）
+- [x] **前端 UI 升级** — Warm Ledger 主题（暖金+深咖啡+玻璃拟态）
+- [x] **PaddleOCR 本地引擎** — 免费离线 OCR，精准提取金额/商户/日期/分类，不可用时自动回退 Vision LLM
 - [ ] 语音记账 — Whisper API 语音转文字
 - [ ] Docker 部署 — docker-compose 一键启动
 - [ ] App 前端 — React Native / Flutter

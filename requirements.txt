@@ -17,3 +17,7 @@ openai>=1.0.0
 passlib[bcrypt]==1.7.4
 PyJWT==2.9.0
 pillow>=10.0.0
+# PaddleOCR 本地 OCR 引擎（可选，不可用时自动回退 vision LLM）
+# 推荐版本组合（经测试稳定）:
+#   pip install paddlepaddle==2.6.2 paddleocr==2.7.3 "numpy<2"
+# 注意: PaddleOCR 3.x 在 Windows 上存在 OneDNN/PIR 兼容性问题

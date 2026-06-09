@@ -164,12 +164,12 @@ class TestOCRService:
 
 class TestOCRAPI:
     def test_recognize_endpoint_mock(self, api):
-        """Mock OCRService 测试端点返回"""
+        """PaddleOCR 不可用时回退到 vision LLM"""
         import app.config
-        import app.api.v1.endpoints.ocr as ocr_module
+        from app.services import ocr_service as vision_ocr_module
 
-        mock_svc = MagicMock()
-        mock_svc.recognize.return_value = OCRResponse(
+        mock_vision = MagicMock()
+        mock_vision.recognize.return_value = OCRResponse(
             success=True,
             raw_text="测试文本",
             items=[ExtractedItem(payee="星巴克", amount=-30.0, direction="支出")],
@@ -179,7 +179,10 @@ class TestOCRAPI:
 
         img = _make_test_image()
         with patch.object(app.config.settings, "OPENAI_API_KEY", "sk-test"), \
-             patch.object(ocr_module, "OCRService", return_value=mock_svc):
+             patch("app.services.paddle_ocr_service.PaddleOCRService") as mock_paddle, \
+             patch.object(vision_ocr_module, "OCRService", return_value=mock_vision):
+            # 模拟 PaddleOCR 不可用（ImportError）
+            mock_paddle.side_effect = ImportError("PaddleOCR not installed")
             resp = api.post("/api/v1/ocr/recognize", files={"file": ("test.jpg", img, "image/jpeg")})
             assert resp.status_code == 200
             data = resp.json()

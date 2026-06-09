@@ -93,56 +93,87 @@ class OCRService:
         return self._parse_response(raw)
 
     def _parse_response(self, raw: str) -> OCRResponse:
-        """解析 vision LLM 返回的纯净 JSON"""
+        """解析 vision LLM 返回的 JSON，多层容错"""
+        import re as re_mod
         text = raw.strip()
-        
-        # 即使开了 json_object 模式，依然保留鲁棒的 markdown 剥离防御机制
-        if text.startswith("```"):
-            lines = text.split("\n")
-            text = "\n".join(lines[1:-1]) if len(lines) > 2 else text
+        logger.info(f"Vision LLM 原始响应 ({len(text)} 字符): {text[:200]}...")
 
-        try:
-            data = json.loads(text)
-            items = []
-            for item in data.get("items", []):
-                # 容错：防止 LLM 把金额写成了正数的支出，在此根据 direction 做一次代码级兜底修正
-                amt = item.get("amount")
-                direction = item.get("direction", "支出")
-                if amt is not None:
-                    try:
-                        amt = float(amt)
-                        if direction == "支出" and amt > 0:
-                            amt = -amt
-                        elif direction == "收入" and amt < 0:
-                            amt = abs(amt)
-                    except (ValueError, TypeError):
-                        amt = 0.0
+        # 1) 剥离 markdown 代码块
+        m = re_mod.search(r'```(?:json)?\s*([\s\S]*?)\s*```', text)
+        if m:
+            text = m.group(1).strip()
+            logger.info("检测到 markdown 代码块包裹，已剥离")
 
-                items.append(
-                    ExtractedItem(
-                        transaction_date=item.get("transaction_date"),
-                        amount=amt,
-                        direction=direction,
-                        payee=item.get("payee"),
-                        description=item.get("description"),
-                        payment_method=item.get("payment_method"),
-                        category=item.get("category"),
-                    )
-                )
+        # 2) 尝试提取 JSON 对象
+        json_text = text
+        # 如果不是以 { 或 [ 开头，尝试提取
+        if not text.startswith('{') and not text.startswith('['):
+            m = re_mod.search(r'\{[\s\S]*\}', text)
+            if m:
+                json_text = m.group(0)
+                logger.info("从文本中提取到 JSON 对象")
 
-            return OCRResponse(
-                success=True,
-                raw_text=data.get("raw_text", ""),
-                items=items,
-                confidence=data.get("confidence", "medium"),
-                message=f"识别完成，成功提取到 {len(items)} 条独立的交易账单记录",
-            )
-        except (json.JSONDecodeError, TypeError) as e:
-            logger.error(f"OCR 原生 JSON 解析严重失败: {e}. 原始返回: {raw}")
+        # 3) 解析 JSON
+        for attempt in range(3):
+            try:
+                data = json.loads(json_text)
+                break
+            except json.JSONDecodeError as e:
+                logger.warning(f"JSON 解析尝试 {attempt+1}: {e}")
+                if attempt == 0:
+                    # 尝试修复常见问题：移除尾部逗号
+                    json_text = re_mod.sub(r',\s*}', '}', json_text)
+                    json_text = re_mod.sub(r',\s*]', ']', json_text)
+                elif attempt == 1:
+                    # 最后手段：宽松匹配
+                    json_text = text.replace('\n', ' ').replace('\r', '')
+                    m = re_mod.search(r'\{[\s\S]*\}', json_text)
+                    json_text = m.group(0) if m else text
+        else:
+            logger.error(f"JSON 解析全部失败。原始响应前 500 字符: {raw[:500]}")
             return OCRResponse(
                 success=False,
-                raw_text=raw,
+                raw_text=raw[:1000],
                 items=[],
                 confidence="low",
-                message=f"大模型结构化输出解析失败: {str(e)[:50]}",
+                message=f"JSON 解析失败（LLM 可能未返回合法 JSON），请检查 VISION_MODEL 配置",
             )
+
+        # 4) 提取 items
+        if isinstance(data, list):
+            # LLM 直接返回了数组
+            raw_items = data
+        else:
+            raw_items = data.get("items", [])
+
+        items = []
+        for item in raw_items:
+            amt = item.get("amount")
+            direction = item.get("direction", "支出")
+            if amt is not None:
+                try:
+                    amt = float(amt)
+                    if direction == "支出" and amt > 0:
+                        amt = -amt
+                    elif direction == "收入" and amt < 0:
+                        amt = abs(amt)
+                except (ValueError, TypeError):
+                    amt = 0.0
+
+            items.append(ExtractedItem(
+                transaction_date=item.get("transaction_date"),
+                amount=amt,
+                direction=direction,
+                payee=item.get("payee"),
+                description=item.get("description"),
+                payment_method=item.get("payment_method"),
+                category=item.get("category"),
+            ))
+
+        return OCRResponse(
+            success=True,
+            raw_text=data.get("raw_text", "") if isinstance(data, dict) else "",
+            items=items,
+            confidence=data.get("confidence", "medium") if isinstance(data, dict) else "medium",
+            message=f"Vision LLM 识别完成，提取到 {len(items)} 条记录",
+        )
