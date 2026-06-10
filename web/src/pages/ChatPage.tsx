@@ -289,7 +289,7 @@ export default function ChatPage() {
           if (msg.role === 'confirm_card') return <ConfirmCard key={i} msg={msg} categories={categories} onConfirm={handleConfirm} onReject={handleReject} />;
           if (msg.role === 'tool_status') return null;
           const isUser = msg.role === 'user';
-          if (!isUser && !msg.content) return null;
+          if (!isUser && !msg.content && (!msg.blocks || msg.blocks.length === 0)) return null;
 
           return (
             <div key={i} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''} animate-slide-up`}>

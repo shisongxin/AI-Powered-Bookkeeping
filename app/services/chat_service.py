@@ -490,6 +490,9 @@ class ChatService:
                     if delta.content:
                         full_reply += delta.content
                 # 混合路由：优先 JSON 内容块，回退 Markdown
+                # 空回复保护：LLM 可能将所有 token 用于 thinking，无可见输出
+                if not full_reply.strip():
+                    full_reply = "抱歉，我正在思考中，请稍后重试。"
                 blocks = self._parse_content_blocks(full_reply)
                 has_structured = any(b['type'] != 'text' for b in blocks)
                 if has_structured:
@@ -665,7 +668,9 @@ class ChatService:
                     delta = chunk.choices[0].delta
                     if delta.content:
                         full_reply += delta.content
-                # 混合路由：优先 JSON 内容块，回退 Markdown
+                # 混合路由 + 空回复保护
+                if not full_reply.strip():
+                    full_reply = "抱歉，我正在思考中，请稍后重试。"
                 blocks = self._parse_content_blocks(full_reply)
                 has_structured = any(b['type'] != 'text' for b in blocks)
                 if has_structured:
@@ -771,8 +776,9 @@ class ChatService:
                         return result
             except (json.JSONDecodeError, Exception):
                 pass
-        # Markdown 回退
-        return [{"type": "text", "content": raw.strip()}]
+        # Markdown 回退 — 空内容时返回占位文本
+        content = raw.strip() or "（空回复）"
+        return [{"type": "text", "content": content}]
 
     @staticmethod
     def _sse(event: str, data: str) -> str:
