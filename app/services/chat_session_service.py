@@ -45,7 +45,7 @@ class ChatSessionService:
         return new_key, []
 
     def save(self, session_key: str, messages: list[dict], persona: str = ""):
-        """将消息历史保存到数据库"""
+        """将消息历史保存到数据库（upsert：存在则更新，不存在则创建）"""
         session = (
             self.db.query(ChatSession)
             .filter(ChatSession.session_key == session_key)
@@ -56,7 +56,12 @@ class ChatSessionService:
             session.updated_at = datetime.now()
             if persona:
                 session.persona = persona
-            self.db.commit()
+        else:
+            session = ChatSession(session_key=session_key, messages=messages)
+            if persona:
+                session.persona = persona
+            self.db.add(session)
+        self.db.commit()
 
     def _maybe_compress(self, session: ChatSession):
         """如果会话超过 TTL，压缩历史记录：保留 system prompt + 最近 N 轮对话"""

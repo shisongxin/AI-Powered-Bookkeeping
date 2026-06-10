@@ -389,14 +389,20 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
   const [removed, setRemoved] = useState<Set<string>>(new Set());
 
   const startEdit = (tcId: string, args: Record<string, unknown>) => {
-    setStates(p => ({ ...p, [tcId]: { editing: true, editForm: {
-      amount: String(args.amount ?? ''), category: String(args.category ?? ''),
-      payee: String(args.payee ?? ''), description: String(args.description ?? ''),
-      transaction_date: String(args.transaction_date ?? ''), payment_method: String(args.payment_method ?? ''),
-    }}}));
+    setStates(p => {
+      // 如果已有保存的 editForm，以此为起点；否则从原始 args 初始化
+      const existing = p[tcId]?.editForm;
+      const base = existing ?? {
+        amount: String(args.amount ?? ''), category: String(args.category ?? ''),
+        payee: String(args.payee ?? ''), description: String(args.description ?? ''),
+        transaction_date: String(args.transaction_date ?? ''), payment_method: String(args.payment_method ?? ''),
+      };
+      return { ...p, [tcId]: { editing: true, editForm: { ...base } } };
+    });
   };
-  const cancelEdit = (tcId: string) => {
-    setStates(p => { const n = { ...p }; delete n[tcId]; return n; });
+  const finishEdit = (tcId: string) => {
+    // 保存编辑内容但退出编辑模式（保留 editForm 供确认时提交）
+    setStates(p => p[tcId]?.editing ? { ...p, [tcId]: { ...p[tcId], editing: false } } : p);
   };
   const updateField = (tcId: string, field: string, value: string) => {
     setStates(p => ({ ...p, [tcId]: { ...p[tcId], editForm: { ...p[tcId]?.editForm, [field]: value } } }));
@@ -413,7 +419,7 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
     for (const bill of bills) {
       if (removed.has(bill.tool_call_id)) continue;
       const st = states[bill.tool_call_id];
-      if (st?.editing && st.editForm) {
+      if (st?.editForm) {
         const m: Record<string, unknown> = { tool_call_id: bill.tool_call_id };
         const a = parseFloat(st.editForm.amount);
         if (!isNaN(a)) m.amount = a;
@@ -460,7 +466,11 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
           const tcId = bill.tool_call_id;
           const st = states[tcId];
           const isEditing = st?.editing;
-          const args = isEditing ? { ...bill.arguments, ...st.editForm } : bill.arguments;
+          // 显示当前生效的值：编辑中用 editForm，非编辑中若有保存的 editForm 则合并，否则用原始值
+          const args = isEditing
+            ? { ...bill.arguments, ...st.editForm }
+            : (st?.editForm ? { ...bill.arguments, ...st.editForm } : bill.arguments);
+          const hasEdits = !!st?.editForm;
           const amount = args.amount as number | undefined;
           const isExpense = amount != null && amount < 0;
 
@@ -497,17 +507,20 @@ function ConfirmCard({ msg, categories, onConfirm, onReject }: {
                     <div><label className="text-[10px] text-espresso-400">支付</label>
                       <input value={st.editForm.payment_method} onChange={e => updateField(tcId, 'payment_method', e.target.value)} className="w-full border border-espresso-200 rounded px-1.5 py-0.5 text-xs" /></div>
                   </div>
-                  <button onClick={() => cancelEdit(tcId)} className="text-xs text-gold-600 hover:text-gold-700 mt-1">完成编辑</button>
+                  <button onClick={() => finishEdit(tcId)} className="text-xs text-gold-600 hover:text-gold-700 mt-1">完成编辑</button>
                 </div>
               ) : (
                 <div className="space-y-0.5">
-                  {args.payee ? <div className="text-espresso-700 font-medium">{String(args.payee)}</div> : null}
+                  <div className="flex items-center gap-2">
+                    {args.payee ? <div className="text-espresso-700 font-medium">{String(args.payee)}</div> : null}
+                    {hasEdits && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">已修改</span>}
+                  </div>
                   <div className="flex flex-wrap gap-x-3 text-xs text-espresso-400">
                     {args.category ? <span>{String(args.category)}</span> : null}
                     {args.transaction_date ? <span>{String(args.transaction_date)}</span> : null}
                     {args.description ? <span className="truncate max-w-[120px]">{String(args.description)}</span> : null}
                   </div>
-                  <button onClick={() => startEdit(tcId, bill.arguments)} className="text-xs text-blue-500 hover:text-blue-600 mt-0.5">✏️ 编辑</button>
+                  <button onClick={() => startEdit(tcId, bill.arguments)} className="text-xs text-blue-500 hover:text-blue-600 mt-0.5">{hasEdits ? '✏️ 继续编辑' : '✏️ 编辑'}</button>
                 </div>
               )}
             </div>

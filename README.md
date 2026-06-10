@@ -4,6 +4,8 @@
 ![alt text](figure/loginpage.png)
 ![alt text](figure/analysispage.png)
 ![alt text](figure/image.png)
+主要亮点：RAG+Agent记账
+
 ## 技术栈
 
 | 层 | 技术 |

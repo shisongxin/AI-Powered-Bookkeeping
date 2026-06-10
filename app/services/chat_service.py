@@ -195,12 +195,14 @@ class ToolExecutor:
         self.db.refresh(bill)
 
         return json.dumps({
-            "success": True,
+            "status": "success",
             "bill": {
                 "id": bill.id,
                 "amount": bill.amount,
                 "direction": bill.direction or ("支出" if bill.amount < 0 else "收入"),
                 "category": bill.category,
+                "payee": bill.payee,
+                "description": bill.description,
                 "transaction_date": bill.transaction_date.strftime("%Y-%m-%d") if bill.transaction_date else None,
             },
         }, ensure_ascii=False)
@@ -620,22 +622,80 @@ class ChatService:
         # 拒绝名单
         skip_ids = set(reject_ids or [])
 
-        # 逐条执行或跳过
+        # 更新 assistant 消息中的 tool_call arguments，确保 LLM 看到的 args
+        # 与即将执行的工具调用一致（避免 LLM 回复引用原始值而非用户修改后的值）
+        if mod_index:
+            for msg in reversed(history):
+                if msg.get("role") == "assistant" and msg.get("tool_calls"):
+                    for tc in msg["tool_calls"]:
+                        tcid = tc["id"]
+                        if tcid in mod_index:
+                            original_args = json.loads(tc["function"]["arguments"])
+                            merged = {**original_args, **mod_index[tcid]}
+                            tc["function"]["arguments"] = json.dumps(merged, ensure_ascii=False)
+                    break  # 只更新最近一个含 tool_calls 的 assistant 消息
+
+        # 逐条执行或跳过，保证每个 tool_call_id 都有对应 tool response
         for bill in pending_bills:
             tcid = bill["tool_call_id"]
             if action == "reject" or tcid in skip_ids:
+                # 忽略：返回 ignored 状态（require.md 规定格式）
                 result_str = json.dumps({
-                    "status": "cancelled",
-                    "message": "用户取消记账",
+                    "status": "ignored",
                 }, ensure_ascii=False)
             else:
-                args = mod_index.get(tcid, bill["arguments"])
+                # 将用户修改合并到原始参数上（mod_index 只有修改字段，不能直接替换）
+                args = dict(bill["arguments"])
+                if tcid in mod_index:
+                    args.update(mod_index[tcid])
+                # 执行 create_bill，返回包含实际 DB 数据的 success 响应
                 result_str = self._get_executor().execute("create_bill", args)
 
             history.append({
                 "role": "tool",
                 "tool_call_id": tcid,
                 "content": result_str,
+            })
+
+        # OpenAI Tool Calling 规范校验：每个 tool_call 必须有对应 tool response
+        pending_ids = {b["tool_call_id"] for b in pending_bills}
+        responded_ids = {
+            h.get("tool_call_id") for h in history
+            if h.get("role") == "tool" and h.get("tool_call_id") in pending_ids
+        }
+        missing = pending_ids - responded_ids
+        if missing:
+            logger.error(f"Tool Calling 规范违反：缺少 tool response 的 tool_call_id: {missing}")
+            yield self._sse("error", "内部错误：工具调用响应不完整")
+            yield self._sse("done", json.dumps({"session_id": sid, "error": "missing tool responses"}))
+            return
+
+        # 构建确认摘要注入 LLM 上下文，确保 LLM 引用实际执行的记账结果
+        confirmed_parts: list[str] = []
+        for bill in pending_bills:
+            tcid = bill["tool_call_id"]
+            if action == "reject" or tcid in skip_ids:
+                continue
+            # 从 tool response 中解析实际记账结果（比重新组装更准确）
+            tool_resp = next(
+                (json.loads(h["content"]) for h in history
+                 if h.get("role") == "tool" and h.get("tool_call_id") == tcid),
+                None,
+            )
+            if tool_resp and tool_resp.get("status") == "success":
+                bill_data = tool_resp.get("bill", {})
+                payee = bill_data.get("payee", "未知")
+                amount = bill_data.get("amount", 0)
+                category = bill_data.get("category", "")
+                confirmed_parts.append(f"{payee} {abs(amount):.2f}元（{category}）")
+
+        if confirmed_parts:
+            summary = "、".join(confirmed_parts)
+            ignored_count = len(skip_ids) + (1 if action == "reject" else 0)
+            history.append({
+                "role": "user",
+                "content": f"【系统确认】用户已确认记账操作。实际记账结果：{summary}。请在回复中引用这些实际结果，不要引用修改前的原始估算值。"
+                          + (f" 已忽略 {ignored_count} 笔账单。" if ignored_count else ""),
             })
 
         # 继续 LLM 对话循环

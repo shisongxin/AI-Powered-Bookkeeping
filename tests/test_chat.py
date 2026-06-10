@@ -154,7 +154,7 @@ class TestToolExecutor:
             "transaction_date": "2026-05-20",
             "payment_method": "微信",
         }))
-        assert result["success"] is True
+        assert result["status"] == "success"
         assert result["bill"]["amount"] == -50.0
         assert result["bill"]["category"] == "餐饮"
         assert result["bill"]["id"] is not None
@@ -529,6 +529,281 @@ class TestStreamEndpoint:
         assert "event: test_event" in sse
         assert "data: test_data" in sse
         assert sse.endswith("\n\n")
+
+
+# ========== 8. 确认流程上下文一致性测试（require.md Bug 1 & Bug 2） ==========
+
+class TestConfirmationFlow:
+    """测试 resume_after_confirmation 的 Tool Calling 规范合规性"""
+
+    def _make_mock_openai_for_resume(self, final_reply: str):
+        """创建 mock client 用于 resume_after_confirmation。
+
+        _continue_conversation 会调用 create 两次：
+        1. 工具选择阶段：返回 tool_calls=None → 进入回复阶段
+        2. 流式回复阶段：返回可迭代的 stream chunks
+        """
+        mock_client = MagicMock()
+        mock_completions = MagicMock()
+
+        # 调用1（工具选择）：无 tool_calls → 进入回复
+        mock_msg1 = MagicMock()
+        mock_msg1.tool_calls = None
+        mock_msg1.content = ""
+        mock_resp1 = MagicMock()
+        mock_resp1.choices = [MagicMock(message=mock_msg1)]
+
+        # 调用2（流式回复）：返回可迭代的 stream
+        # _continue_conversation 用 for chunk in stream: 迭代
+        # 每个 chunk 需要有 chunk.choices[0].delta.content
+        def make_chunk(text):
+            chunk = MagicMock()
+            delta = MagicMock()
+            delta.content = text
+            chunk.choices = [MagicMock(delta=delta)]
+            return chunk
+
+        stream_chunks = [make_chunk(final_reply)]
+
+        mock_completions.create.side_effect = [mock_resp1, iter(stream_chunks)]
+        mock_client.chat.completions = mock_completions
+        return mock_client
+
+    def _seed_session_with_pending_bills(self, db, session_id: str,
+                                          bills: list[dict]) -> list[dict]:
+        """构造一个包含待确认 create_bill tool_calls 的 history"""
+        history = [
+            {"role": "system", "content": "System prompt"},
+            {"role": "user", "content": "午餐35元，打车20元"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {
+                            "name": "create_bill",
+                            "arguments": json.dumps(tc["arguments"]),
+                        },
+                    }
+                    for tc in bills
+                ],
+            },
+        ]
+        # 持久化到 DB
+        svc = ChatSessionService(db)
+        svc.save(session_id, history)
+        return history
+
+    def test_bug1_modified_args_merged_not_replaced(self, db):
+        """Bug 1: 修改金额时，原始参数（payee/transaction_date）不能丢失"""
+        seed_for_chat(db)
+        sid = "test_merge_001"
+        bills = [
+            {"id": "tc_001", "arguments": {
+                "amount": -35, "category": "餐饮", "payee": "麦当劳",
+                "description": "午餐", "transaction_date": "2026-06-10",
+                "payment_method": "微信",
+            }},
+        ]
+        self._seed_session_with_pending_bills(db, sid, bills)
+
+        svc = ChatService(db, confirm_mode=True)
+        svc.client = self._make_mock_openai_for_resume("已记录餐饮支出28元。")
+
+        # 用户将金额从 35 改为 28
+        modified = [{"tool_call_id": "tc_001", "amount": -28}]
+        events = list(svc.resume_after_confirmation(sid, "confirm", modified))
+
+        # 验证 DB 中写入的是修改后的金额
+        from app.models.bill import Bill
+        latest = db.query(Bill).order_by(Bill.id.desc()).first()
+        assert latest is not None
+        assert latest.amount == -28.0, f"期望金额 -28，实际 {latest.amount}"
+        # 验证原始字段未丢失
+        assert latest.payee == "麦当劳", f"期望 payee=麦当劳，实际 {latest.payee}"
+        assert latest.description == "午餐"
+        assert latest.payment_method == "微信"
+
+    def test_bug1_assistant_tool_call_args_updated(self, db):
+        """Bug 1: history 中 assistant tool_call arguments 必须更新为修改后的值"""
+        seed_for_chat(db)
+        sid = "test_args_update_002"
+        bills = [
+            {"id": "tc_001", "arguments": {"amount": -35, "category": "餐饮"}},
+        ]
+        self._seed_session_with_pending_bills(db, sid, bills)
+
+        svc = ChatService(db, confirm_mode=True)
+        svc.client = self._make_mock_openai_for_resume("已记录。")
+
+        modified = [{"tool_call_id": "tc_001", "amount": -28, "category": "午餐"}]
+        list(svc.resume_after_confirmation(sid, "confirm", modified))
+
+        # 从 DB 读取 history，验证 assistant tool_call arguments 已更新
+        session = db.query(ChatSession).filter(ChatSession.session_key == sid).first()
+        history = session.messages
+        assistant_msg = next((m for m in history if m.get("role") == "assistant" and m.get("tool_calls")), None)
+        tc_args = json.loads(assistant_msg["tool_calls"][0]["function"]["arguments"])
+        assert tc_args["amount"] == -28, f"期望 args.amount=-28，实际 {tc_args['amount']}"
+        assert tc_args["category"] == "午餐", f"期望 args.category=午餐，实际 {tc_args['category']}"
+
+    def test_bug2_ignored_bill_gets_tool_response(self, db):
+        """Bug 2: 忽略的账单必须有 tool response，否则 LLM 会再次触发确认"""
+        seed_for_chat(db)
+        sid = "test_ignore_003"
+        bills = [
+            {"id": "tc_001", "arguments": {"amount": -35, "category": "餐饮", "payee": "麦当劳"}},
+            {"id": "tc_002", "arguments": {"amount": -20, "category": "交通", "payee": "滴滴"}},
+            {"id": "tc_003", "arguments": {"amount": -50, "category": "购物", "payee": "淘宝"}},
+        ]
+        self._seed_session_with_pending_bills(db, sid, bills)
+
+        svc = ChatService(db, confirm_mode=True)
+        svc.client = self._make_mock_openai_for_resume("已记录2笔账单，忽略1笔。")
+
+        # 忽略 tc_002，确认 tc_001 和 tc_003
+        events = list(svc.resume_after_confirmation(
+            sid, "confirm", reject_ids=["tc_002"]
+        ))
+
+        # 验证 history 中每个 tool_call 都有对应 tool response
+        session = db.query(ChatSession).filter(ChatSession.session_key == sid).first()
+        history = session.messages
+        tool_calls = [
+            tc for m in history if m.get("role") == "assistant" and m.get("tool_calls")
+            for tc in m["tool_calls"]
+        ]
+        tool_responses = [
+            h for h in history if h.get("role") == "tool"
+        ]
+        tc_ids = {tc["id"] for tc in tool_calls}
+        resp_ids = {h.get("tool_call_id") for h in tool_responses}
+        missing = tc_ids - resp_ids
+        assert not missing, f"缺少 tool response 的 tool_call_id: {missing}"
+
+        # 验证被忽略的账单返回 ignored 状态
+        ignored_resp = next(
+            (json.loads(h["content"]) for h in tool_responses if h.get("tool_call_id") == "tc_002"),
+            None,
+        )
+        assert ignored_resp is not None
+        assert ignored_resp["status"] == "ignored", f"期望 ignored，实际 {ignored_resp['status']}"
+
+        # 验证被忽略的账单没有写入 DB
+        from app.models.bill import Bill
+        bill_count = db.query(Bill).count()
+        # seed 有 3 条 + 确认 2 条 = 5（不是 6）
+        assert bill_count == 5, f"期望 5 条账单（3 seed + 2 确认），实际 {bill_count}"
+
+    def test_bug2_no_duplicate_confirmation_after_ignore(self, db):
+        """Bug 2: 忽略后 LLM 不应再次触发 create_bill 确认"""
+        seed_for_chat(db)
+        sid = "test_no_dup_004"
+        bills = [
+            {"id": "tc_001", "arguments": {"amount": -35, "category": "餐饮", "payee": "麦当劳"}},
+            {"id": "tc_002", "arguments": {"amount": -20, "category": "交通", "payee": "滴滴"}},
+        ]
+        self._seed_session_with_pending_bills(db, sid, bills)
+
+        # 构造一个会再次触发 create_bill 的 mock（模拟 LLM 不遵守规范的情况）
+        mock_client = MagicMock()
+        mock_completions = MagicMock()
+
+        # 第一次调用：LLM 直接回复（不再触发 create_bill）
+        mock_msg_reply = MagicMock()
+        mock_msg_reply.tool_calls = None
+        mock_msg_reply.content = "已记录1笔，忽略1笔。"
+        mock_resp_reply = MagicMock()
+        mock_resp_reply.choices = [MagicMock(message=mock_msg_reply)]
+        mock_completions.create.return_value = mock_resp_reply
+
+        mock_client.chat.completions = mock_completions
+        svc = ChatService(db, confirm_mode=True)
+        svc.client = mock_client
+
+        events = list(svc.resume_after_confirmation(
+            sid, "confirm", reject_ids=["tc_002"]
+        ))
+
+        # 验证没有再次触发 confirm_required 事件
+        confirm_events = [e for e in events if isinstance(e, str) and "confirm_required" in e]
+        assert len(confirm_events) == 0, "忽略后不应再次触发确认"
+
+    def test_tool_response_format_success(self, db):
+        """验证成功 tool response 格式符合 require.md 规定"""
+        seed_for_chat(db)
+        sid = "test_format_005"
+        bills = [
+            {"id": "tc_001", "arguments": {
+                "amount": -35, "category": "餐饮", "payee": "麦当劳",
+                "transaction_date": "2026-06-10",
+            }},
+        ]
+        self._seed_session_with_pending_bills(db, sid, bills)
+
+        svc = ChatService(db, confirm_mode=True)
+        svc.client = self._make_mock_openai_for_resume("已记录。")
+        list(svc.resume_after_confirmation(sid, "confirm"))
+
+        session = db.query(ChatSession).filter(ChatSession.session_key == sid).first()
+        history = session.messages
+        tool_resp = next(h for h in history if h.get("role") == "tool")
+        data = json.loads(tool_resp["content"])
+
+        assert data["status"] == "success"
+        assert "bill" in data
+        assert data["bill"]["amount"] == -35.0
+        assert data["bill"]["category"] == "餐饮"
+        assert data["bill"]["payee"] == "麦当劳"
+
+    def test_tool_response_format_ignored(self, db):
+        """验证忽略 tool response 格式符合 require.md 规定"""
+        seed_for_chat(db)
+        sid = "test_format_006"
+        bills = [
+            {"id": "tc_001", "arguments": {"amount": -35, "category": "餐饮"}},
+        ]
+        self._seed_session_with_pending_bills(db, sid, bills)
+
+        svc = ChatService(db, confirm_mode=True)
+        svc.client = self._make_mock_openai_for_resume("已忽略。")
+        list(svc.resume_after_confirmation(sid, "confirm", reject_ids=["tc_001"]))
+
+        session = db.query(ChatSession).filter(ChatSession.session_key == sid).first()
+        history = session.messages
+        tool_resp = next(h for h in history if h.get("role") == "tool")
+        data = json.loads(tool_resp["content"])
+
+        assert data["status"] == "ignored"
+        assert "bill" not in data  # 忽略时不应有 bill 数据
+
+    def test_confirmation_summary_injected(self, db):
+        """验证确认摘要消息注入到 LLM 上下文中"""
+        seed_for_chat(db)
+        sid = "test_summary_007"
+        bills = [
+            {"id": "tc_001", "arguments": {
+                "amount": -35, "category": "餐饮", "payee": "麦当劳",
+            }},
+        ]
+        self._seed_session_with_pending_bills(db, sid, bills)
+
+        svc = ChatService(db, confirm_mode=True)
+        svc.client = self._make_mock_openai_for_resume("已记录麦当劳35元。")
+        list(svc.resume_after_confirmation(sid, "confirm"))
+
+        session = db.query(ChatSession).filter(ChatSession.session_key == sid).first()
+        history = session.messages
+        # 找到系统确认消息
+        summary_msgs = [
+            m for m in history
+            if m.get("role") == "user" and "系统确认" in m.get("content", "")
+        ]
+        assert len(summary_msgs) == 1, "应有一条系统确认消息"
+        assert "麦当劳" in summary_msgs[0]["content"]
+        assert "35.00元" in summary_msgs[0]["content"]
 
 
 if __name__ == "__main__":
