@@ -16,6 +16,16 @@
 
 主要亮点：RAG+Agent记账 + 多用户数据隔离 + 微信登录态认证 + 全链路安全防护
 
+前端界面视频演示：
+
+1、流水分析版块：https://github.com/user-attachments/assets/78ffcaaa-a0ce-4842-8cb0-1c02ed3ad37f
+
+2、账单明细版块：https://github.com/user-attachments/assets/6bef2222-f127-4df6-be85-ddaf0ac2c143
+
+3、AI记账版块：https://github.com/user-attachments/assets/48ee38ce-25ae-49f5-9014-df85e9e363c1
+
+4、分类管理版块：https://github.com/user-attachments/assets/864d9f8e-3c1d-4559-aa11-8b1fea02009a
+
 ## 技术栈
 
 | 层 | 技术 |
