@@ -10,6 +10,7 @@ from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse, UserResponse
 from app.config import settings
+from app.services.default_categories import DefaultCategoryService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -31,6 +32,14 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # 为新用户创建默认分类
+    try:
+        DefaultCategoryService.create_default_categories(db, user)
+    except Exception as e:
+        # 创建默认分类失败不影响注册
+        import logging
+        logging.getLogger(__name__).warning(f"创建默认分类失败: {e}")
 
     # 签发 token
     token = create_access_token(user.id)

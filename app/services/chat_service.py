@@ -69,12 +69,14 @@ class ToolExecutor:
 
     def __init__(self, db: Session, current_time_str: str = "",
                  image_base64: str = "", image_content_type: str = "image/jpeg",
-                 openai_client: Optional[OpenAI] = None):
+                 openai_client: Optional[OpenAI] = None,
+                 user_id: Optional[int] = None):
         self.db = db
         self.current_time_str = current_time_str or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.image_base64 = image_base64
         self.image_content_type = image_content_type
         self.llm_client = openai_client  # 复用 ChatService 的 OpenAI 连接
+        self.user_id = user_id  # 当前用户 ID，用于数据隔离
 
     def execute(self, tool_name: str, arguments: dict) -> str:
         """执行工具调用，返回 JSON 字符串结果"""
@@ -178,7 +180,7 @@ class ToolExecutor:
             transaction_date=trans_date,
             note=args.get("remark"),
         )
-        bill = svc.create_bill(bill_data)
+        bill = svc.create_bill(bill_data, user_id=self.user_id)
 
         # 补充 direction/payee/description/remark 字段
         if args.get("direction"):
@@ -330,6 +332,8 @@ class ChatService:
         self._image_type = image_content_type
         # 二次确认模式：创建账单前需要用户确认
         self._confirm_mode = confirm_mode
+        # 当前用户 ID（用于数据隔离）
+        self._current_user_id: Optional[int] = None
         # 延迟初始化 executor（在 chat/chat_stream 中创建，确保时间锚点已就绪）
         self.executor: Optional[ToolExecutor] = None
 
@@ -337,7 +341,7 @@ class ChatService:
         if self.executor is None:
             self.executor = ToolExecutor(
                 self.db, self._time_anchor, self._image_b64, self._image_type,
-                openai_client=self.client,
+                openai_client=self.client, user_id=self._current_user_id,
             )
         return self.executor
 
@@ -355,9 +359,10 @@ class ChatService:
             ]
         return message
 
-    def chat(self, message: str, session_id: Optional[str] = None, persona: str = "") -> dict:
+    def chat(self, message: str, session_id: Optional[str] = None, persona: str = "", user_id: Optional[int] = None) -> dict:
         """处理用户消息，返回包含回复和工具调用追踪的结果。会话持久化到 DB，支持 TTL 压缩。"""
-        sid, history = self.session_svc.get_or_create(session_id)
+        self._current_user_id = user_id
+        sid, history = self.session_svc.get_or_create(session_id, user_id=user_id)
 
         # 始终刷新 system prompt 中的当前时间（每次对话都更新为实时时间）
         persona_prompt = _get_persona_prompt(persona)
@@ -447,9 +452,10 @@ class ChatService:
 
         return "抱歉，处理您的请求时遇到了一些问题，请稍后重试。"
 
-    def chat_stream(self, message: str, session_id: Optional[str] = None, persona: str = ""):
+    def chat_stream(self, message: str, session_id: Optional[str] = None, persona: str = "", user_id: Optional[int] = None):
         """流式对话：生成器逐条产出 SSE 格式字符串。会话持久化到 DB。"""
-        sid, history = self.session_svc.get_or_create(session_id)
+        self._current_user_id = user_id
+        sid, history = self.session_svc.get_or_create(session_id, user_id=user_id)
 
         # 始终刷新 system prompt 中的当前时间
         persona_prompt = _get_persona_prompt(persona)
@@ -578,14 +584,16 @@ class ChatService:
 
     def resume_after_confirmation(self, session_id: str, action: str,
                                   modified_arguments: list = None,
-                                  reject_ids: list = None):
+                                  reject_ids: list = None,
+                                  user_id: Optional[int] = None):
         """用户确认/取消后恢复对话流（支持批量账单 + 逐条拒绝）。
         action='confirm': 执行待确认的 create_bill，reject_ids 中的除外。
         action='reject': 跳过所有待确认的 create_bill。
         modified_arguments: [{tool_call_id, ...fields}] 用户修改后的参数列表。
         reject_ids: 要单独拒绝的 tool_call_id 列表。
         """
-        sid, history = self.session_svc.get_or_create(session_id)
+        self._current_user_id = user_id
+        sid, history = self.session_svc.get_or_create(session_id, user_id=user_id)
 
         # 收集最后一个 assistant 消息中所有待确认的 create_bill
         pending_bills: list[dict] = []

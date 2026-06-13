@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
 from app.models.chat_session import ChatSession
@@ -20,32 +21,72 @@ class ChatSessionService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_or_create(self, session_key: Optional[str] = None) -> Tuple[str, list[dict]]:
+    def get_or_create(self, session_key: Optional[str] = None, user_id: Optional[int] = None) -> Tuple[str, list[dict]]:
         """获取已有会话或创建新会话。
         返回 (session_key, messages_history)。
         如果会话超过 TTL，自动压缩历史记录。
+
+        Args:
+            session_key: 会话标识
+            user_id: 用户 ID，用于隔离不同用户的会话
         """
         if session_key:
-            existing = (
-                self.db.query(ChatSession)
-                .filter(ChatSession.session_key == session_key)
-                .first()
-            )
+            q = self.db.query(ChatSession).filter(ChatSession.session_key == session_key)
+            # 如果指定了 user_id，只返回该用户的会话
+            if user_id is not None:
+                q = q.filter(ChatSession.user_id == user_id)
+            existing = q.first()
             if existing:
                 # 检查 TTL 是否需要压缩
                 self._maybe_compress(existing)
                 return existing.session_key, existing.messages or []
 
-        # 创建新会话
-        new_key = session_key or uuid.uuid4().hex[:12]
-        session = ChatSession(session_key=new_key, messages=[])
-        self.db.add(session)
-        self.db.commit()
-        logger.info(f"新会话已创建: {new_key}")
-        return new_key, []
+        # 创建新会话（确保 session_key 唯一）
+        new_key = session_key
+        if not new_key:
+            new_key = uuid.uuid4().hex[:16]  # 16位hex，冲突概率极低
 
-    def save(self, session_key: str, messages: list[dict], persona: str = ""):
-        """将消息历史保存到数据库（upsert：存在则更新，不存在则创建）"""
+        session = ChatSession(session_key=new_key, messages=[], user_id=user_id)
+        self.db.add(session)
+
+        try:
+            self.db.commit()
+            logger.info(f"新会话已创建: {new_key}, user_id={user_id}")
+            return new_key, []
+        except IntegrityError:
+            # 唯一约束冲突，回滚并生成新的 key
+            self.db.rollback()
+            logger.warning(f"session_key 冲突: {new_key}，重新生成")
+
+            for _ in range(5):
+                new_key = uuid.uuid4().hex[:16]
+                session = ChatSession(session_key=new_key, messages=[], user_id=user_id)
+                self.db.add(session)
+                try:
+                    self.db.commit()
+                    logger.info(f"新会话已创建（重试）: {new_key}, user_id={user_id}")
+                    return new_key, []
+                except IntegrityError:
+                    self.db.rollback()
+                    continue
+
+            # 5次都失败，使用时间戳
+            new_key = f"{int(datetime.now().timestamp())}_{uuid.uuid4().hex[:8]}"
+            session = ChatSession(session_key=new_key, messages=[], user_id=user_id)
+            self.db.add(session)
+            self.db.commit()
+            logger.info(f"新会话已创建（最终）: {new_key}, user_id={user_id}")
+            return new_key, []
+
+    def save(self, session_key: str, messages: list[dict], persona: str = "", user_id: Optional[int] = None):
+        """将消息历史保存到数据库（upsert：存在则更新，不存在则创建）
+
+        Args:
+            session_key: 会话标识
+            messages: 消息历史
+            persona: 角色风格
+            user_id: 用户 ID（创建新会话时使用）
+        """
         session = (
             self.db.query(ChatSession)
             .filter(ChatSession.session_key == session_key)
@@ -57,7 +98,7 @@ class ChatSessionService:
             if persona:
                 session.persona = persona
         else:
-            session = ChatSession(session_key=session_key, messages=messages)
+            session = ChatSession(session_key=session_key, messages=messages, user_id=user_id)
             if persona:
                 session.persona = persona
             self.db.add(session)

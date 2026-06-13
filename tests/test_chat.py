@@ -531,7 +531,7 @@ class TestStreamEndpoint:
         assert sse.endswith("\n\n")
 
 
-# ========== 8. 确认流程上下文一致性测试（require.md Bug 1 & Bug 2） ==========
+# ========== 8. 确认流程上下文一致性测试 ==========
 
 class TestConfirmationFlow:
     """测试 resume_after_confirmation 的 Tool Calling 规范合规性"""

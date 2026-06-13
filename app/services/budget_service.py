@@ -27,14 +27,22 @@ class BudgetService:
 
     # ---------- CRUD ----------
 
-    def set_budget(self, data: BudgetCreate) -> Budget:
+    def set_budget(self, data: BudgetCreate, user_id: int) -> Budget:
         """设置/覆盖预算（同一年月+分类唯一约束下 upsert）"""
+        # 先查找同一年月+分类的记录（不考虑 user_id）
         existing = (
             self.db.query(Budget)
-            .filter(Budget.year == data.year, Budget.month == data.month, Budget.category == data.category)
+            .filter(
+                Budget.year == data.year,
+                Budget.month == data.month,
+                Budget.category == data.category,
+            )
             .first()
         )
         if existing:
+            # 如果记录存在但 user_id 为 NULL，更新 user_id
+            if existing.user_id is None:
+                existing.user_id = user_id
             existing.amount = data.amount
             if data.note is not None:
                 existing.note = data.note
@@ -43,21 +51,29 @@ class BudgetService:
             self.db.refresh(existing)
             return existing
 
-        budget = Budget(year=data.year, month=data.month, category=data.category,
-                        amount=data.amount, note=data.note)
+        budget = Budget(
+            year=data.year, month=data.month, category=data.category,
+            amount=data.amount, note=data.note, user_id=user_id,
+        )
         self.db.add(budget)
         self.db.commit()
         self.db.refresh(budget)
         return budget
 
-    def get_budgets(self, year: int, month: int) -> list[Budget]:
-        """获取指定年月的所有预算"""
-        return (
-            self.db.query(Budget)
-            .filter(Budget.year == year, Budget.month == month)
-            .order_by(Budget.category)
-            .all()
-        )
+    def get_budget_by_id(self, budget_id: int) -> Optional[Budget]:
+        """根据 ID 获取单个预算"""
+        return self.db.query(Budget).filter(Budget.id == budget_id).first()
+
+    def get_budgets(self, year: int, month: int, user_id: Optional[int] = None) -> list[Budget]:
+        """获取指定年月的所有预算
+
+        Args:
+            user_id: 用户 ID，为 None 时返回所有预算（向后兼容）
+        """
+        q = self.db.query(Budget).filter(Budget.year == year, Budget.month == month)
+        if user_id is not None:
+            q = q.filter(Budget.user_id == user_id)
+        return q.order_by(Budget.category).all()
 
     def update_budget(self, budget_id: int, data: BudgetUpdate) -> Budget | None:
         """部分更新预算"""
@@ -84,7 +100,7 @@ class BudgetService:
 
     # ---------- 预算 vs 实际 ----------
 
-    def vs_actual(self, year: int, month: int) -> BudgetVsActualResponse:
+    def vs_actual(self, year: int, month: int, user_id: Optional[int] = None) -> BudgetVsActualResponse:
         """对比预算与实际支出，返回每个分类的消耗状态"""
         stats_svc = StatisticsService(self.db)
         # 获取该月实际支出分布
@@ -96,11 +112,12 @@ class BudgetService:
             start_date=date(year, month, 1),
             end_date=date(year, month, last_day),
             direction="支出",
+            user_id=user_id,
         )
         actual_map = {item.category: item.amount for item in actual_items}
 
         # 获取该月预算
-        budgets = self.get_budgets(year, month)
+        budgets = self.get_budgets(year, month, user_id=user_id)
         budget_map = {b.category: b.amount for b in budgets}
 
         # 合并所有分类
@@ -144,7 +161,7 @@ class BudgetService:
 
     # ---------- 自动生成预算 ----------
 
-    def auto_generate(self, year: int, month: int) -> list[Budget]:
+    def auto_generate(self, year: int, month: int, user_id: int) -> list[Budget]:
         """基于上月实际消费数据自动生成当月预算（上浮 10% 缓冲）。
         若当月已有预算则跳过不覆盖；若上月无消费数据则返回空列表。
         """
@@ -165,6 +182,7 @@ class BudgetService:
             start_date=date(prev_year, prev_month, 1),
             end_date=date(prev_year, prev_month, last_day),
             direction="支出",
+            user_id=user_id,
         )
 
         if not breakdown:
@@ -172,7 +190,7 @@ class BudgetService:
             return []
 
         # 获取当月已有预算（不覆盖）
-        existing = {b.category for b in self.get_budgets(year, month)}
+        existing = {b.category for b in self.get_budgets(year, month, user_id=user_id)}
         created: list[Budget] = []
 
         for item in breakdown:
@@ -184,6 +202,7 @@ class BudgetService:
                 year=year, month=month,
                 category=item.category,
                 amount=suggested,
+                user_id=user_id,
                 note=f"基于上月 ({prev_year}-{prev_month:02d}) 消费 {item.amount:.0f} 元自动生成",
             )
             self.db.add(budget)
@@ -201,7 +220,8 @@ class BudgetService:
     # ---------- AI 预算建议 ----------
 
     def suggest_budget(self, year: int, month: int,
-                       client: Optional[OpenAI] = None) -> list[BudgetSuggestionItem]:
+                       client: Optional[OpenAI] = None,
+                       user_id: Optional[int] = None) -> list[BudgetSuggestionItem]:
         """基于近 3 个月历史消费数据，由 LLM 生成下月预算建议。
         client 参数由 ChatService 传入以复用已有连接；为空时自动创建。
         """
@@ -222,6 +242,7 @@ class BudgetService:
                 start_date=date(y, m, 1),
                 end_date=date(y, m, last_day),
                 direction="支出",
+                user_id=user_id,
             )
             for item in breakdown:
                 history.setdefault(item.category, []).append(item.amount)

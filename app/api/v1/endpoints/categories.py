@@ -3,7 +3,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
+from app.models.user import User
 from app.services.category_service import CategoryService
+from app.services.default_categories import DefaultCategoryService
 from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse, MatchRequest, MatchResponse
 
 router = APIRouter(prefix="/categories", tags=["categories"])
@@ -54,10 +57,30 @@ def match_category(data: MatchRequest, db: Session = Depends(get_db)):
 
 
 @router.delete("/{category_id}")
-def delete_category(category_id: int, db: Session = Depends(get_db)):
+def delete_category(
+    category_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """删除分类"""
-    svc = CategoryService(db)
+    svc = CategoryService(db, current_user)
     ok = svc.delete(category_id)
     if not ok:
         raise HTTPException(status_code=404, detail="分类不存在")
     return {"detail": "已删除"}
+
+
+@router.post("/reset", response_model=list[CategoryResponse])
+def reset_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """重置分类为默认分类（删除所有现有分类，重新创建默认分类）"""
+    created = DefaultCategoryService.reset_user_categories(db, current_user)
+    return created
+
+
+@router.get("/defaults", response_model=list[dict])
+def get_default_categories():
+    """获取默认分类配置（用于前端展示）"""
+    return DefaultCategoryService.get_default_categories()

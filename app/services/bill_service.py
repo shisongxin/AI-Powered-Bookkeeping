@@ -27,8 +27,18 @@ class BillService:
                 return c.id
         return None
 
-    def create_bill(self, bill_data: BillCreate) -> Bill:
-        db_bill = Bill(**bill_data.model_dump())
+    def create_bill(self, bill_data: BillCreate, user_id: int) -> Bill:
+        # 先检查是否已存在相同记录（避免重复创建）
+        existing = self._find_duplicate_bill(bill_data, user_id)
+        if existing:
+            # 如果记录存在但 user_id 为 NULL，更新 user_id
+            if existing.user_id is None:
+                existing.user_id = user_id
+                self.db.commit()
+                self.db.refresh(existing)
+            return existing
+
+        db_bill = Bill(**bill_data.model_dump(), user_id=user_id)
         # 自动补全 category_id
         if not db_bill.category_id and db_bill.category:
             db_bill.category_id = self._resolve_category_id(db_bill.category)
@@ -37,9 +47,55 @@ class BillService:
         self.db.refresh(db_bill)
         return db_bill
 
-    def get_bills(self, skip: int = 0, limit: int = 100, order: str = "desc"):
-        """获取账单列表，默认按时间倒序（最新在前）"""
+    def _find_duplicate_bill(self, bill_data: BillCreate, user_id: int) -> Optional[Bill]:
+        """查找是否存在重复账单记录
+
+        检查逻辑：
+        1. 如果 bill_data 有 transaction_id，按 transaction_id 查找
+        2. 否则按 transaction_date + amount + category 查找
+        3. 同时匹配 user_id 为 NULL 或相同 user_id 的记录
+        """
         q = self.db.query(Bill)
+
+        # 按 transaction_id 查找
+        if hasattr(bill_data, 'transaction_id') and bill_data.transaction_id:
+            q = q.filter(Bill.transaction_id == bill_data.transaction_id)
+        else:
+            # 按日期+金额+分类查找
+            if bill_data.transaction_date:
+                q = q.filter(
+                    Bill.transaction_date == bill_data.transaction_date,
+                    Bill.amount == bill_data.amount,
+                )
+                if bill_data.category:
+                    q = q.filter(Bill.category == bill_data.category)
+            else:
+                return None
+
+        # 匹配 user_id 为 NULL 或相同 user_id 的记录
+        from sqlalchemy import or_
+        q = q.filter(
+            or_(
+                Bill.user_id.is_(None),
+                Bill.user_id == user_id,
+            )
+        )
+
+        return q.first()
+
+    def get_bill_by_id(self, bill_id: int) -> Optional[Bill]:
+        """根据 ID 获取单个账单"""
+        return self.db.query(Bill).filter(Bill.id == bill_id).first()
+
+    def get_bills(self, skip: int = 0, limit: int = 100, order: str = "desc", user_id: Optional[int] = None):
+        """获取账单列表，默认按时间倒序（最新在前）
+
+        Args:
+            user_id: 用户 ID，为 None 时返回所有账单（向后兼容）
+        """
+        q = self.db.query(Bill)
+        if user_id is not None:
+            q = q.filter(Bill.user_id == user_id)
         if order == "asc":
             q = q.order_by(Bill.transaction_date.asc().nullsfirst())
         else:
@@ -73,9 +129,15 @@ class BillService:
 
     def search_bills(self, keyword: str = "", start_date: str = "",
                      end_date: str = "", category: str = "",
-                     skip: int = 0, limit: int = 100) -> List[Bill]:
-        """搜索账单：支持关键词（匹配 payee/description/remark）、日期范围、分类"""
+                     skip: int = 0, limit: int = 100, user_id: Optional[int] = None) -> List[Bill]:
+        """搜索账单：支持关键词（匹配 payee/description/remark）、日期范围、分类
+
+        Args:
+            user_id: 用户 ID，为 None 时返回所有账单（向后兼容）
+        """
         q = self.db.query(Bill)
+        if user_id is not None:
+            q = q.filter(Bill.user_id == user_id)
 
         if keyword:
             like_pat = f"%{keyword}%"
@@ -121,25 +183,36 @@ class BillService:
         fallback_id = self._resolve_category_id(fallback)
         return fallback, fallback_id
 
-    def import_from_parsed_records(self, records: List[FlexibleBillRecord]) -> dict:
+    def import_from_parsed_records(self, records: List[FlexibleBillRecord], user_id: int) -> dict:
         db = self.db
         created = 0
         skipped = 0
         errors = []
         for rec in records:
             try:
+                # 改进的重复检测：同时检查 user_id 为 NULL 和具体 user_id 的记录
                 if rec.transaction_id:
-                    existing = db.query(Bill).filter(Bill.transaction_id == rec.transaction_id).first()
+                    # 先检查 transaction_id 是否已存在（不考虑 user_id）
+                    existing = db.query(Bill).filter(
+                        Bill.transaction_id == rec.transaction_id
+                    ).first()
                 else:
                     if rec.transaction_date is None:
                         skipped += 1
                         continue
+                    # 检查相同日期、金额、收款人的记录（不考虑 user_id）
                     existing = db.query(Bill).filter(
                         Bill.transaction_date == rec.transaction_date,
                         Bill.amount == rec.amount,
                         Bill.payee == rec.payee,
                     ).first()
+
                 if existing:
+                    # 如果记录存在但 user_id 为 NULL，更新 user_id
+                    if existing.user_id is None:
+                        existing.user_id = user_id
+                        db.commit()
+                        # 不算新建也不算跳过，是更新
                     skipped += 1
                     continue
 
@@ -155,6 +228,7 @@ class BillService:
                 )
                 bill = Bill(
                     **bill_create.model_dump(),
+                    user_id=user_id,
                     direction=rec.direction,
                     payee=rec.payee,
                     description=rec.description,

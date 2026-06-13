@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1.endpoints import bills, categories, chat, statistics, auth, ocr, budgets
+from app.api.v1.endpoints import bills, categories, chat, statistics, auth, ocr, budgets, wechat
 from app.config import settings
 
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +61,7 @@ app.include_router(statistics.router, prefix=settings.API_V1_PREFIX)
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(ocr.router, prefix=settings.API_V1_PREFIX)
 app.include_router(budgets.router, prefix=settings.API_V1_PREFIX)
+app.include_router(wechat.router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")

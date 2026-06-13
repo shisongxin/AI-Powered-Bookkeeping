@@ -1,7 +1,10 @@
 # app/api/v1/endpoints/bills.py
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
+from typing import Optional
 from app.core.database import get_db
+from app.core.dependencies import get_current_active_user
+from app.models.user import User
 from app.services.bill_service import BillService
 from app.schemas.bill import BillCreate, BillUpdate, BillResponse
 from app.utils.bill_parser import parse_bill
@@ -15,22 +18,34 @@ router = APIRouter(prefix="/bills", tags=["bills"])
 ALLOWED_EXTENSIONS = {".csv", ".xlsx", ".xls", ".pdf"}
 
 @router.post("/", response_model=BillResponse)
-def create_bill(bill: BillCreate, db: Session = Depends(get_db)):
-    """创建账单列表"""
+def create_bill(bill: BillCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """创建账单（需要登录）"""
     service = BillService(db)
-    return service.create_bill(bill)
+    return service.create_bill(bill, user_id=current_user.id)
 
 @router.get("/", response_model=list[BillResponse])
-def get_bills(skip: int = 0, limit: int = 100, order: str = "desc", db: Session = Depends(get_db)):
-    """获取账单列表，默认按时间倒序（最新在前）。order=asc 可切换为正序"""
+def get_bills(
+    skip: int = 0,
+    limit: int = 100,
+    order: str = "desc",
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_active_user),
+):
+    """获取当前用户的账单列表，默认按时间倒序（最新在前）。
+
+    - 已登录用户：返回自己的账单
+    - 未登录用户：返回所有账单（向后兼容）
+    """
     service = BillService(db)
-    return service.get_bills(skip=skip, limit=limit, order=order)
+    user_id = current_user.id if current_user else None
+    return service.get_bills(skip=skip, limit=limit, order=order, user_id=user_id)
 
 # 文件上传接口
 @router.post("/upload")
 def upload_bill_file(
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
     上传账单文件并自动解析入库
@@ -66,7 +81,7 @@ def upload_bill_file(
         )
        # 数据入库
         service = BillService(db)
-        result = service.import_from_parsed_records(parsed_records)
+        result = service.import_from_parsed_records(parsed_records, user_id=current_user.id)
         logger.info(
             f"账单导入完成 "
             f"created={result['created']} "
@@ -101,22 +116,28 @@ def upload_bill_file(
 
 
 @router.put("/{bill_id}", response_model=BillResponse)
-def update_bill(bill_id: int, data: BillUpdate, db: Session = Depends(get_db)):
-    """更新指定账单的部分字段"""
+def update_bill(bill_id: int, data: BillUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """更新指定账单的部分字段（仅可更新自己的账单）"""
     service = BillService(db)
-    bill = service.update_bill(bill_id, data)
+    bill = service.get_bill_by_id(bill_id)
     if not bill:
         raise HTTPException(status_code=404, detail="账单不存在")
-    return bill
+    if bill.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权操作此账单")
+    updated = service.update_bill(bill_id, data)
+    return updated
 
 
 @router.delete("/{bill_id}")
-def delete_bill(bill_id: int, db: Session = Depends(get_db)):
-    """删除指定账单"""
+def delete_bill(bill_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """删除指定账单（仅可删除自己的账单）"""
     service = BillService(db)
-    ok = service.delete_bill(bill_id)
-    if not ok:
+    bill = service.get_bill_by_id(bill_id)
+    if not bill:
         raise HTTPException(status_code=404, detail="账单不存在")
+    if bill.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权操作此账单")
+    service.delete_bill(bill_id)
     return {"success": True, "message": f"账单 {bill_id} 已删除"}
 
 
@@ -129,9 +150,11 @@ def search_bills(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_active_user),
 ):
     """搜索账单：支持关键词（匹配商户/描述/备注）、日期范围、分类过滤"""
     service = BillService(db)
+    user_id = current_user.id if current_user else None
     return service.search_bills(
         keyword=keyword,
         start_date=start_date,
@@ -139,4 +162,5 @@ def search_bills(
         category=category,
         skip=skip,
         limit=limit,
+        user_id=user_id,
     )

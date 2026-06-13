@@ -16,11 +16,14 @@ class StatisticsService:
     def __init__(self, db: Session):
         self.db = db
 
-    def monthly_summary(self, year: int, month: int) -> MonthlySummary:
-        bills = self.db.query(Bill).filter(
+    def monthly_summary(self, year: int, month: int, user_id: Optional[int] = None) -> MonthlySummary:
+        q = self.db.query(Bill).filter(
             func.extract("year", Bill.transaction_date) == year,
             func.extract("month", Bill.transaction_date) == month,
-        ).all()
+        )
+        if user_id is not None:
+            q = q.filter(Bill.user_id == user_id)
+        bills = q.all()
 
         income = sum(b.amount for b in bills if b.amount > 0)
         expense = sum(abs(b.amount) for b in bills if b.amount < 0)
@@ -38,6 +41,7 @@ class StatisticsService:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         direction: str = "支出",
+        user_id: Optional[int] = None,
     ) -> List[CategoryBreakdownItem]:
         q = self.db.query(
             Bill.category,
@@ -48,6 +52,9 @@ class StatisticsService:
             q = q.filter(Bill.amount < 0)
         elif direction == "收入":
             q = q.filter(Bill.amount > 0)
+
+        if user_id is not None:
+            q = q.filter(Bill.user_id == user_id)
 
         if start_date:
             q = q.filter(Bill.transaction_date >= start_date)
@@ -73,11 +80,14 @@ class StatisticsService:
         start_date: date,
         end_date: date,
         granularity: str = "monthly",
+        user_id: Optional[int] = None,
     ) -> List[TrendItem]:
         q = self.db.query(Bill).filter(
             Bill.transaction_date >= start_date,
             Bill.transaction_date < end_date + timedelta(days=1),
         )
+        if user_id is not None:
+            q = q.filter(Bill.user_id == user_id)
 
         bills = q.all()
 
