@@ -1,0 +1,49 @@
+/* 金额输入组件样式 */
+.amount-input-container {
+  display: flex;
+  align-items: center;
+  background: #ffffff;
+  border: 2rpx solid #e8e8e8;
+  border-radius: 16rpx;
+  padding: 20rpx 24rpx;
+  transition: all 0.2s ease;
+}
+.amount-input-container.focused {
+  border-color: #667eea;
+  box-shadow: 0 0 0 4rpx rgba(102, 126, 234, 0.1);
+}
+.amount-input-container.disabled {
+  background: #f5f5f5;
+  opacity: 0.6;
+}
+.amount-symbol {
+  margin-right: 16rpx;
+}
+.symbol-text {
+  font-size: 48rpx;
+  font-weight: bold;
+  color: #333333;
+}
+.amount-input {
+  flex: 1;
+  font-size: 48rpx;
+  font-weight: 500;
+  color: #333333;
+  height: 60rpx;
+  line-height: 60rpx;
+}
+.clear-btn {
+  width: 40rpx;
+  height: 40rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e8e8e8;
+  border-radius: 50%;
+  margin-left: 12rpx;
+}
+.clear-icon {
+  font-size: 28rpx;
+  color: #999999;
+  line-height: 1;
+}

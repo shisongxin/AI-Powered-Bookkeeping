@@ -1,0 +1,643 @@
+/* 账单列表页样式 — 仿 Web 端深色+金色风格 */
+.bills-container {
+  min-height: 100vh;
+  background: #faf7f5;
+}
+
+/* ===== 顶部统计 ===== */
+.summary-card {
+  padding: 28rpx 30rpx;
+  background: linear-gradient(135deg, #2d241c 0%, #1c1917 100%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.summary-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-text {
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.summary-subtext {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4rpx;
+}
+
+.summary-amount {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #fbbf24;
+  font-family: 'SF Pro Display', -apple-system, sans-serif;
+}
+
+/* ===== 滚动区域 ===== */
+.bills-scroll {
+  height: calc(100vh - 220rpx);
+}
+
+/* ===== 分组 ===== */
+.bill-group {
+  margin-top: 16rpx;
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 30rpx;
+  background: #f5f0eb;
+}
+
+.group-date {
+  font-size: 26rpx;
+  color: #4a3f35;
+  font-weight: 500;
+}
+
+.group-summary {
+  font-size: 22rpx;
+  color: #a89580;
+}
+
+/* ===== 账单项 ===== */
+.bill-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 30rpx;
+  background: #ffffff;
+  border-bottom: 1rpx solid #f0ebe5;
+}
+
+.bill-item:active {
+  background: #faf7f5;
+}
+
+.bill-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.bill-category-icon {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #faf7f5;
+  border-radius: 50%;
+  margin-right: 20rpx;
+}
+
+.bill-category-icon text {
+  font-size: 36rpx;
+}
+
+.bill-info {
+  flex: 1;
+}
+
+.bill-category {
+  display: block;
+  font-size: 28rpx;
+  color: #2d241c;
+  font-weight: 500;
+  margin-bottom: 6rpx;
+}
+
+.bill-note {
+  display: block;
+  font-size: 24rpx;
+  color: #a89580;
+  margin-top: 4rpx;
+}
+
+.bill-right {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.bill-amount {
+  display: block;
+  font-size: 32rpx;
+  font-weight: 700;
+  font-family: 'SF Pro Display', -apple-system, sans-serif;
+}
+
+.bill-amount.in {
+  color: #10b981;
+}
+
+.bill-amount.out {
+  color: #2d241c;
+}
+
+.bill-time {
+  display: block;
+  font-size: 22rpx;
+  color: #a89580;
+  margin-top: 6rpx;
+}
+
+/* ===== 加载更多 ===== */
+.loading-more {
+  padding: 30rpx;
+  text-align: center;
+}
+
+.loading-more text {
+  font-size: 26rpx;
+  color: #a89580;
+}
+
+/* ===== 空状态 ===== */
+.empty-state {
+  padding: 120rpx 30rpx;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 96rpx;
+  margin-bottom: 24rpx;
+}
+
+.empty-text {
+  display: block;
+  font-size: 30rpx;
+  color: #8b7355;
+  margin-bottom: 12rpx;
+}
+
+.empty-hint {
+  display: block;
+  font-size: 26rpx;
+  color: #a89580;
+}
+
+/* ===== 错误状态 ===== */
+.error-state {
+  padding: 120rpx 30rpx;
+  text-align: center;
+}
+
+.error-state text {
+  font-size: 28rpx;
+  color: #ef4444;
+}
+
+/* ===== 底部添加按钮 ===== */
+.add-bill-footer {
+  padding: 30rpx;
+  padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
+}
+
+.add-bill-btn {
+  width: 100%;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border-radius: 44rpx;
+  box-shadow: 0 6rpx 20rpx rgba(245, 158, 11, 0.3);
+}
+
+.add-bill-btn:active {
+  transform: scale(0.98);
+  opacity: 0.95;
+  box-shadow: 0 3rpx 10rpx rgba(245, 158, 11, 0.2);
+}
+
+.add-bill-btn::after {
+  border: none;
+}
+
+.add-bill-icon {
+  font-size: 36rpx;
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.add-bill-text {
+  font-size: 32rpx;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* ===== 搜索提示 ===== */
+.search-hint {
+  padding: 16rpx 20rpx;
+  margin-bottom: 16rpx;
+  background: #eff6ff;
+  border-radius: 12rpx;
+}
+
+.search-hint-text {
+  font-size: 22rpx;
+  color: #3b82f6;
+}
+
+/* ===== 日期输入框 ===== */
+.date-input {
+  width: 100%;
+  height: 72rpx;
+  padding: 0 20rpx;
+  background: #faf7f5;
+  border: 2rpx solid #e8e0d8;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #2d241c;
+}
+
+.date-input:focus {
+  border-color: #f59e0b;
+  background: #ffffff;
+}
+
+/* ===== 搜索栏 ===== */
+.search-bar {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 30rpx;
+  background: #ffffff;
+  gap: 16rpx;
+  border-bottom: 1rpx solid #f0ebe5;
+}
+
+.search-input-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #faf7f5;
+  border-radius: 32rpx;
+  padding: 14rpx 20rpx;
+}
+
+.search-icon {
+  font-size: 28rpx;
+  margin-right: 12rpx;
+  color: #a89580;
+}
+
+.search-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #2d241c;
+}
+
+.search-clear {
+  width: 40rpx;
+  height: 40rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #c4b5a5;
+  border-radius: 20rpx;
+  margin-left: 12rpx;
+}
+
+.search-clear text {
+  font-size: 24rpx;
+  color: #ffffff;
+}
+
+.filter-btn {
+  padding: 14rpx 24rpx;
+  background: #faf7f5;
+  border-radius: 32rpx;
+  font-size: 26rpx;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+.filter-btn:active {
+  background: #f0ebe5;
+}
+
+/* ===== 筛选面板 ===== */
+.filter-panel {
+  background: #ffffff;
+  padding: 24rpx 30rpx;
+  border-bottom: 1rpx solid #f0ebe5;
+}
+
+.filter-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.filter-label {
+  width: 140rpx;
+  font-size: 26rpx;
+  color: #8b7355;
+}
+
+.filter-input {
+  flex: 1;
+  padding: 14rpx 16rpx;
+  background: #faf7f5;
+  border-radius: 12rpx;
+  font-size: 26rpx;
+  color: #2d241c;
+}
+
+.filter-direction {
+  display: flex;
+  gap: 12rpx;
+}
+
+.dir-btn {
+  padding: 12rpx 24rpx;
+  background: #faf7f5;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  color: #8b7355;
+}
+
+.dir-btn.active {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 24rpx;
+}
+
+.filter-reset {
+  flex: 1;
+  padding: 22rpx;
+  text-align: center;
+  background: #faf7f5;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #8b7355;
+}
+
+.filter-apply {
+  flex: 1;
+  padding: 22rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.filter-reset:active {
+  background: #f0ebe5;
+}
+
+.filter-apply:active {
+  opacity: 0.9;
+}
+
+/* ===== 删除按钮 ===== */
+.bill-delete {
+  padding: 12rpx;
+}
+
+.bill-delete:active {
+  opacity: 0.6;
+}
+
+/* ===== 表格表头 ===== */
+.bill-table-header {
+  display: flex;
+  padding: 20rpx 30rpx;
+  background: #f5f0eb;
+  border-bottom: 1rpx solid #e8e0d8;
+}
+
+.bill-table-header text {
+  font-size: 24rpx;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+.header-date {
+  width: 100rpx;
+}
+
+.header-category {
+  width: 90rpx;
+}
+
+.header-payee {
+  width: 120rpx;
+}
+
+.header-desc {
+  flex: 1;
+  padding: 0 10rpx;
+}
+
+.header-amount {
+  width: 110rpx;
+  text-align: right;
+}
+
+.header-action {
+  width: 80rpx;
+  text-align: center;
+}
+
+/* ===== 账单行 ===== */
+.bill-item-container {
+  background: #ffffff;
+}
+
+.bill-item {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 30rpx;
+  border-bottom: 1rpx solid #f0ebe5;
+}
+
+.bill-item:active {
+  background: #faf7f5;
+}
+
+.bill-date {
+  width: 100rpx;
+  font-size: 22rpx;
+  color: #a89580;
+}
+
+.bill-category-wrapper {
+  width: 90rpx;
+}
+
+.bill-category {
+  font-size: 24rpx;
+  color: #2d241c;
+}
+
+.bill-payee {
+  width: 120rpx;
+  font-size: 24rpx;
+  color: #2d241c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bill-desc {
+  flex: 1;
+  font-size: 22rpx;
+  color: #a89580;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 10rpx;
+}
+
+.bill-actions {
+  display: flex;
+  gap: 8rpx;
+  width: 100rpx;
+  justify-content: center;
+}
+
+.bill-edit-btn,
+.bill-delete-btn {
+  padding: 8rpx;
+}
+
+.bill-edit-btn:active,
+.bill-delete-btn:active {
+  opacity: 0.6;
+}
+
+/* ===== 编辑行 ===== */
+.bill-edit-row {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 30rpx;
+  background: #fffdf5;
+  border-bottom: 1rpx solid #f0ebe5;
+  gap: 8rpx;
+}
+
+.edit-input {
+  height: 64rpx;
+  padding: 0 12rpx;
+  font-size: 24rpx;
+  background: #ffffff;
+  border: 2rpx solid #e8e0d8;
+  border-radius: 12rpx;
+}
+
+.edit-date {
+  width: 140rpx;
+}
+
+.edit-category {
+  width: 120rpx;
+}
+
+.edit-payee {
+  flex: 1;
+}
+
+.edit-amount {
+  width: 120rpx;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8rpx;
+}
+
+.edit-save,
+.edit-cancel {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 32rpx;
+}
+
+.edit-save {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.edit-cancel {
+  background: #f5f0eb;
+  color: #8b7355;
+}
+
+/* ===== 分类按钮 ===== */
+.filter-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  flex: 1;
+}
+
+.cat-btn {
+  padding: 12rpx 20rpx;
+  background: #faf7f5;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  color: #8b7355;
+}
+
+.cat-btn.active {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.cat-btn:active {
+  opacity: 0.8;
+}
+
+/* ===== 月份选择器 ===== */
+.filter-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx 20rpx;
+  background: #faf7f5;
+  border-radius: 12rpx;
+  min-width: 200rpx;
+}
+
+.filter-picker text {
+  font-size: 26rpx;
+  color: #2d241c;
+}
+
+.picker-arrow {
+  font-size: 20rpx;
+  color: #a89580;
+}
+
+/* ===== 清除全部按钮 ===== */
+.filter-clear {
+  flex: 1;
+  padding: 22rpx;
+  text-align: center;
+  background: #fef2f2;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #ef4444;
+}
+
+.filter-clear:active {
+  background: #fecaca;
+}

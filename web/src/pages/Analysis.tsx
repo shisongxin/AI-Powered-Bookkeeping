@@ -25,7 +25,6 @@ export default function Analysis() {
   const [autoGenLoading, setAutoGenLoading] = useState(false);
   const [autoGenMsg, setAutoGenMsg] = useState('');
   const [granularity, setGranularity] = useState('daily');
-  const [trendYear, setTrendYear] = useState(cy);
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie'); // 饼图/条状图
 
   // 预算手动设置
@@ -36,18 +35,21 @@ export default function Analysis() {
 
   const refreshData = () => {
     setLoading(true);
-    const startD = `${year}-${String(month).padStart(2, '0')}-01`;
-    const endD = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+    const monthStartD = `${year}-${String(month).padStart(2, '0')}-01`;
+    const monthEndD = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+    // 按月显示全年趋势，按日/周显示当月趋势
+    const trendStartD = granularity === 'monthly' ? `${year}-01-01` : monthStartD;
+    const trendEndD = granularity === 'monthly' ? `${year}-12-31` : monthEndD;
     Promise.all([
       statisticsApi.monthlySummary(year, month).catch(() => null),
-      statisticsApi.trend(`${trendYear}-01-01`, `${trendYear}-12-31`, granularity).catch(() => []),
-      statisticsApi.byCategory({ start_date: startD, end_date: endD, direction: '支出' }).catch(() => []),
+      statisticsApi.trend(trendStartD, trendEndD, granularity).catch(() => []),
+      statisticsApi.byCategory({ start_date: monthStartD, end_date: monthEndD, direction: '支出' }).catch(() => []),
       budgetsApi.vsActual(year, month).catch(() => null),
     ]).then(([s, t, b, v]) => { setSummary(s); setTrend(t); setBreakdown(b); setBudgetVs(v); })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { refreshData(); }, [year, month, granularity, trendYear]);
+  useEffect(() => { refreshData(); }, [year, month, granularity]);
 
   const handleAutoGenerate = async () => {
     setAutoGenLoading(true); setAutoGenMsg('');
@@ -108,9 +110,8 @@ export default function Analysis() {
           {/* Trend Line Chart */}
           <div className="glass-card p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-espresso-700 uppercase tracking-wider">收支趋势</h2>
+              <h2 className="text-sm font-semibold text-espresso-700 uppercase tracking-wider">{granularity === 'monthly' ? `${year}年收支趋势` : `${year}年${month}月收支趋势`}</h2>
               <div className="flex items-center gap-2">
-                <select value={trendYear} onChange={e => setTrendYear(Number(e.target.value))} className="select-field !py-1 !text-xs !w-auto">{[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}</select>
                 <select value={granularity} onChange={e => setGranularity(e.target.value)} className="select-field !py-1 !text-xs !w-auto"><option value="daily">按日</option><option value="weekly">按周</option><option value="monthly">按月</option></select>
               </div>
             </div>

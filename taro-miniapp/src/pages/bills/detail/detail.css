@@ -1,0 +1,167 @@
+/* 账单详情页样式 — 仿 Web 端深色+金色风格 */
+.detail-container {
+  min-height: 100vh;
+  background: #faf7f5;
+  padding-bottom: 40rpx;
+}
+
+/* ===== 金额区域 ===== */
+.amount-section {
+  padding: 60rpx 30rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #2d241c 0%, #1c1917 100%);
+  margin-bottom: 24rpx;
+}
+
+.amount-label {
+  display: block;
+  font-size: 26rpx;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 16rpx;
+}
+
+.amount-value {
+  display: block;
+  font-size: 72rpx;
+  font-weight: 700;
+  font-family: 'SF Pro Display', -apple-system, sans-serif;
+}
+
+.amount-value.income {
+  color: #10b981;
+}
+
+.amount-value.expense {
+  color: #fbbf24;
+}
+
+/* ===== 信息列表 ===== */
+.info-section {
+  background: #ffffff;
+  margin: 0 30rpx 24rpx;
+  padding: 0 30rpx;
+  border-radius: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(45, 36, 28, 0.06);
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid #f0ebe5;
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  font-size: 28rpx;
+  color: #a89580;
+  min-width: 140rpx;
+}
+
+.info-value {
+  font-size: 28rpx;
+  color: #2d241c;
+  text-align: right;
+  flex: 1;
+  word-break: break-all;
+}
+
+/* ===== 操作按钮区域 ===== */
+.action-section {
+  padding: 40rpx 30rpx;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 20rpx;
+}
+
+.action-btn {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.action-btn.edit {
+  background: #ffffff;
+  color: #f59e0b;
+  border: 2rpx solid #f59e0b;
+}
+
+.action-btn.delete {
+  background: #ffffff;
+  color: #ef4444;
+  border: 2rpx solid #ef4444;
+}
+
+.action-btn:active {
+  opacity: 0.8;
+  transform: scale(0.97);
+}
+
+/* ===== 加载状态 ===== */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #a89580;
+}
+
+/* ===== 错误状态 ===== */
+.error-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  padding: 40rpx;
+}
+
+.error-text {
+  font-size: 28rpx;
+  color: #ef4444;
+  margin-bottom: 30rpx;
+  text-align: center;
+}
+
+.retry-btn {
+  padding: 24rpx 60rpx;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #ffffff;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+/* ===== 空状态 ===== */
+.empty-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  padding: 40rpx;
+}
+
+.empty-icon {
+  font-size: 96rpx;
+  margin-bottom: 24rpx;
+}
+
+.empty-text {
+  font-size: 28rpx;
+  color: #a89580;
+}

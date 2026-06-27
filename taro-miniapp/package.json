@@ -1,0 +1,36 @@
+{
+  "name": "ai-bookkeeping-miniapp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI记账 - 微信小程序",
+  "scripts": {
+    "dev:weapp": "taro build --type weapp --watch",
+    "build:weapp": "taro build --type weapp",
+    "dev:h5": "taro build --type h5 --watch"
+  },
+  "dependencies": {
+    "@tarojs/components": "3.6.38",
+    "@tarojs/plugin-framework-react": "3.6.38",
+    "@tarojs/plugin-platform-h5": "3.6.38",
+    "@tarojs/plugin-platform-weapp": "3.6.38",
+    "@tarojs/react": "3.6.38",
+    "@tarojs/runtime": "3.6.38",
+    "@tarojs/taro": "3.6.38",
+    "@tarojs/webpack5-runner": "^3.6.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.0",
+    "@babel/preset-react": "^7.22.0",
+    "@babel/preset-typescript": "^7.23.0",
+    "@tarojs/cli": "3.6.38",
+    "@tarojs/helper": "3.6.38",
+    "@tarojs/runner-utils": "3.6.38",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.3.0",
+    "webpack": "5.89.0"
+  }
+}

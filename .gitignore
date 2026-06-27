@@ -12,3 +12,4 @@ build/
 *.egg-info/
 .claude/
 skills-lock.json
+node_modules

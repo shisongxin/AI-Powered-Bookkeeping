@@ -1,0 +1,30 @@
+/* 日期选择组件样式 */
+.date-picker-container {
+  width: 100%;
+}
+.date-picker-display {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+  background: #ffffff;
+  border: 2rpx solid #e8e8e8;
+  border-radius: 16rpx;
+  transition: all 0.2s ease;
+}
+.date-picker-display:active {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+.date-text {
+  font-size: 28rpx;
+  color: #333333;
+}
+.date-text.placeholder {
+  color: #999999;
+}
+.date-arrow {
+  font-size: 20rpx;
+  color: #999999;
+  margin-left: 12rpx;
+}
