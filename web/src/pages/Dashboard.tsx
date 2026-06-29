@@ -175,8 +175,8 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <span className={`text-sm font-semibold tabular-nums shrink-0 ml-3
-                    ${b.amount < 0 ? 'text-coral-600' : 'text-emerald-600'}`}>
-                    {b.amount < 0 ? '−' : '+'}{Math.abs(b.amount).toFixed(2)}
+                    ${b.direction === '收入' ? 'text-emerald-600' : 'text-coral-600'}`}>
+                    {b.direction === '收入' ? '+' : '−'}{Math.abs(b.amount).toFixed(2)}
                   </span>
                 </div>
               ))}

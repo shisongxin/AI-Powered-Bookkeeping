@@ -219,7 +219,7 @@ class BillService:
                 category_name, category_id = self._auto_categorize(rec)
 
                 bill_create = BillCreate(
-                    amount=rec.amount or 0,
+                    amount=abs(rec.amount) if rec.amount else 0,
                     category=category_name,
                     category_id=category_id,
                     note=rec.remark,

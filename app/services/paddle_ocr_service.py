@@ -309,12 +309,14 @@ class PaddleOCRService:
             # 支付方式
             payment = _detect_payment(line) or _detect_payment(full_text)
 
-            # 金额方向（支出为负）
-            direction = "支出" if amt <= 0 else "收入"
+            # 统一规范：金额始终为正，根据关键词判断收支方向
+            # 收入关键词匹配（工资、奖金、红包、退款、报销、理财等）
+            _income_keywords = ["工资", "奖金", "红包", "退款", "报销", "理财", "利息", "分红", "转账", "收入", "兼职"]
+            direction = "收入" if any(kw in (payee + line) for kw in _income_keywords) else "支出"
 
             items.append(ExtractedItem(
                 transaction_date=date_str,
-                amount=amt if amt <= 0 else amt,
+                amount=abs(amt),  # 始终为正
                 direction=direction,
                 payee=payee if payee else None,
                 description=line.strip(),

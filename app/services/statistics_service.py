@@ -25,8 +25,9 @@ class StatisticsService:
             q = q.filter(Bill.user_id == user_id)
         bills = q.all()
 
-        income = sum(b.amount for b in bills if b.amount > 0)
-        expense = sum(abs(b.amount) for b in bills if b.amount < 0)
+        # 使用 direction 字段判断收支（amount 始终为正值）
+        income = sum(abs(b.amount) or 0 for b in bills if b.direction == "收入")
+        expense = sum(abs(b.amount) or 0 for b in bills if b.direction == "支出")
         return MonthlySummary(
             year=year,
             month=month,
@@ -48,10 +49,8 @@ class StatisticsService:
             func.sum(func.abs(Bill.amount)).label("total"),
             func.count(Bill.id).label("cnt"),
         )
-        if direction == "支出":
-            q = q.filter(Bill.amount < 0)
-        elif direction == "收入":
-            q = q.filter(Bill.amount > 0)
+        # 使用 direction 字段判断收支
+        q = q.filter(Bill.direction == direction)
 
         if user_id is not None:
             q = q.filter(Bill.user_id == user_id)
@@ -105,9 +104,15 @@ class StatisticsService:
 
             if key not in buckets:
                 buckets[key] = {"income": 0.0, "expense": 0.0}
-            if b.amount > 0:
-                buckets[key]["income"] += b.amount
-            else:
+            # 使用 direction 字段判断收支
+            if b.direction == "收入":
+                buckets[key]["income"] += abs(b.amount) or 0
+            elif b.direction == "支出":
+                buckets[key]["expense"] += abs(b.amount) or 0
+            elif b.amount and b.amount > 0:
+                # 对于没有 direction 的数据，使用 amount 符号
+                buckets[key]["income"] += abs(b.amount)
+            elif b.amount and b.amount < 0:
                 buckets[key]["expense"] += abs(b.amount)
 
         result = []

@@ -18,7 +18,7 @@ OCR_SYSTEM_PROMPT = """你是一个高精度的账单/收据图像 OCR 结构化
 【核心推理规则】
 1. 完整的日期推理：图片中若只显示当天的时间（如 "11:46"、"17:04"）。请结合用户提供的[当前系统时间]，推导出每笔交易最合理的实际发生日期（格式必须为 YYYY-MM-DD）。
 2. 多笔交易拆分：若图片中按时间流展现了多张卡片或多笔扣款（例如多个不同的商户、不同的金额），必须将其解析为 `items` 列表中的多个独立对象，绝对不能合并。
-3. 收支符号：支出金额在 JSON 中必须记录为【负数】（如 -16.0），收入记录为【正数】（如 500.0）。
+3. 金额规范：金额必须始终为【正数】（如 16.0、500.0），收支类型由 `direction` 字段决定（"收入" 或 "支出"）。绝对不要在金额前加负号。
 4. 字段规范：`payee` 提取完整的商户全称（如 "上海田律餐饮管理有限公司"），`category` 根据商户名智能归类到（餐饮/交通/购物/娱乐/医疗/居住/其他）。
 
 请直接返回满足以下结构的 JSON 对象：
@@ -27,7 +27,7 @@ OCR_SYSTEM_PROMPT = """你是一个高精度的账单/收据图像 OCR 结构化
   "items": [
     {
       "transaction_date": "YYYY-MM-DD",
-      "amount": -16.0,
+      "amount": 16.0,
       "direction": "支出",
       "payee": "商户全称",
       "description": "交易描述（如：使用零钱通支付）",
@@ -152,11 +152,8 @@ class OCRService:
             direction = item.get("direction", "支出")
             if amt is not None:
                 try:
-                    amt = float(amt)
-                    if direction == "支出" and amt > 0:
-                        amt = -amt
-                    elif direction == "收入" and amt < 0:
-                        amt = abs(amt)
+                    # 统一规范：金额始终为正，direction 决定收支类型
+                    amt = abs(float(amt))
                 except (ValueError, TypeError):
                     amt = 0.0
 

@@ -11,7 +11,7 @@ class BillBase(BaseModel):
     transaction_date: Optional[datetime] = None
 
 class BillCreate(BillBase):
-    pass
+    direction: Optional[str] = None  # "收入" / "支出"
 
 
 class BillUpdate(BaseModel):
@@ -47,7 +47,7 @@ class BillResponse(BillBase):
 class FlexibleBillRecord(BaseModel):
     """宽松的账单记录模型，用于智能解析，所有字段均可为空"""
     transaction_date: Optional[datetime] = None
-    amount: Optional[float] = None          # 金额（支出为负，收入为正）
+    amount: Optional[float] = None          # 金额（始终为正，收支类型由 direction 字段决定）
     direction: Optional[str] = None         # "支出"/"收入"
     payee: Optional[str] = None             # 交易对方
     description: Optional[str] = None       # 商品说明或描述

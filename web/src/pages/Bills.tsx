@@ -52,7 +52,16 @@ export default function Bills() {
       const m = (b.transaction_date || b.created_at || '').slice(0, 7); if (!m) continue;
       if (!g[m]) { const [y, mo] = m.split('-'); g[m] = { month: m, label: `${y}年${mo}月`, bills: [], income: 0, expense: 0, balance: 0 }; }
       g[m].bills.push(b);
-      if (b.amount > 0) g[m].income += b.amount; else g[m].expense += Math.abs(b.amount);
+      // 统一使用 direction 字段判断收支
+      if (b.direction === '收入') {
+        g[m].income += Math.abs(b.amount);
+      } else if (b.direction === '支出') {
+        g[m].expense += Math.abs(b.amount);
+      } else {
+        // 对于没有 direction 的数据，使用 amount 符号
+        if (b.amount > 0) g[m].income += b.amount;
+        else g[m].expense += Math.abs(b.amount);
+      }
       g[m].balance = g[m].income - g[m].expense;
     }
     return Object.values(g).sort((a, b) => b.month.localeCompare(a.month));
@@ -106,6 +115,11 @@ export default function Bills() {
   };
 
   const renderRow = (b: BillResponse) => {
+    // 统一使用 direction 字段判断收支
+    const isIncome = b.direction === '收入' || (!b.direction && b.amount > 0)
+    const amountColor = isIncome ? 'text-emerald-600' : 'text-coral-600'
+    const amountSign = isIncome ? '+' : '-'
+
     if (editingBillId === b.id) {
       return (
         <tr key={b.id} className="bg-gold-50/50">
@@ -124,7 +138,7 @@ export default function Bills() {
         <td className="px-3 py-3"><span className="badge">{b.category}</span></td>
         <td className="px-3 py-3 text-espresso-700 text-sm max-w-[180px] truncate font-medium">{b.payee || b.description || '-'}</td>
         <td className="px-3 py-3 text-espresso-400 text-xs max-w-[140px] truncate hidden md:table-cell">{b.description || b.remark || ''}</td>
-        <td className={`px-3 py-3 text-right font-semibold text-sm tabular-nums whitespace-nowrap ${b.amount < 0 ? 'text-coral-600' : 'text-emerald-600'}`}>{fmt(b.amount)}</td>
+        <td className={`px-3 py-3 text-right font-semibold text-sm tabular-nums whitespace-nowrap ${amountColor}`}>{amountSign}¥{Math.abs(b.amount).toFixed(2)}</td>
         <td className="px-3 py-3 text-center opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="flex items-center justify-center gap-1">
             <button onClick={() => startEdit(b)} className="px-2.5 py-1 text-xs text-gold-700 hover:bg-gold-100 rounded-lg transition-colors font-medium">编辑</button>
@@ -223,7 +237,7 @@ export default function Bills() {
                   <span className="badge-gold">{group.bills.length} 笔</span>
                   <div className="flex items-center gap-5 ml-auto text-sm">
                     <Stat label="收入" value={group.income} color="text-emerald-600" />
-                    <Stat label="支出" value={-group.expense} color="text-coral-600" />
+                    <Stat label="支出" value={group.expense} color="text-coral-600" isExpense />
                     <Stat label="结余" value={group.balance} color={group.balance >= 0 ? 'text-blue-600' : 'text-coral-600'} />
                   </div>
                 </button>
@@ -248,6 +262,8 @@ export default function Bills() {
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: number; color: string }) {
-  return <div className="text-right"><span className="text-xs text-espresso-300 mr-1">{label}</span><span className={`font-semibold tabular-nums ${color}`}>{value < 0 ? '−' : '+'}{Math.abs(value).toFixed(0)}</span></div>;
+function Stat({ label, value, color, isExpense }: { label: string; value: number; color: string; isExpense?: boolean }) {
+  // 支出显示为负数（如 -¥100），收入显示为正数（如 +¥500），结余根据正负显示
+  const sign = isExpense ? '−' : (value < 0 ? '−' : '+')
+  return <div className="text-right"><span className="text-xs text-espresso-300 mr-1">{label}</span><span className={`font-semibold tabular-nums ${color}`}>{sign}{Math.abs(value).toFixed(0)}</span></div>;
 }
