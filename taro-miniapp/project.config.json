@@ -2,7 +2,7 @@
   "miniprogramRoot": "dist/",
   "projectname": "ai-bookkeeping",
   "description": "AI记账小程序",
-  "appid": "wx0000000000000000",
+  "appid": "wxfcad84235c0206ad",
   "setting": {
     "urlCheck": false,
     "es6": true,

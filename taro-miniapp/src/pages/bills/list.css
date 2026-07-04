@@ -1,178 +1,888 @@
-/* 账单列表页样式 — 仿 Web 端深色+金色风格 */
+/* ============================================
+   账单列表页样式 — Enhanced Monthly Fold Design
+   aligned with web/ Bills.tsx
+   ============================================ */
+
+/* ─── Container ─── */
 .bills-container {
   min-height: 100vh;
   background: #faf7f5;
+  position: relative;
 }
 
-/* ===== 顶部统计 ===== */
+/* ─── Summary Card (dark gradient) ─── */
 .summary-card {
-  padding: 28rpx 30rpx;
+  padding: 32rpx 30rpx 28rpx;
   background: linear-gradient(135deg, #2d241c 0%, #1c1917 100%);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  position: relative;
+  overflow: hidden;
 }
 
-.summary-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.summary-text {
-  font-size: 26rpx;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.summary-subtext {
-  font-size: 22rpx;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 4rpx;
-}
-
-.summary-amount {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #fbbf24;
-  font-family: 'SF Pro Display', -apple-system, sans-serif;
-}
-
-/* ===== 滚动区域 ===== */
-.bills-scroll {
-  height: calc(100vh - 220rpx);
-}
-
-/* ===== 分组 ===== */
-.bill-group {
-  margin-top: 16rpx;
-}
-
-.group-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20rpx 30rpx;
-  background: #f5f0eb;
-}
-
-.group-date {
-  font-size: 26rpx;
-  color: #4a3f35;
-  font-weight: 500;
-}
-
-.group-summary {
-  font-size: 22rpx;
-  color: #a89580;
-}
-
-/* ===== 账单项 ===== */
-.bill-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 28rpx 30rpx;
-  background: #ffffff;
-  border-bottom: 1rpx solid #f0ebe5;
-}
-
-.bill-item:active {
-  background: #faf7f5;
-}
-
-.bill-left {
-  display: flex;
-  align-items: center;
-  flex: 1;
-}
-
-.bill-category-icon {
-  width: 72rpx;
-  height: 72rpx;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #faf7f5;
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: -60rpx;
+  right: -40rpx;
+  width: 200rpx;
+  height: 200rpx;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.12) 0%, transparent 70%);
   border-radius: 50%;
-  margin-right: 20rpx;
 }
 
-.bill-category-icon text {
-  font-size: 36rpx;
+.summary-top {
+  margin-bottom: 20rpx;
 }
 
-.bill-info {
-  flex: 1;
-}
-
-.bill-category {
-  display: block;
+.summary-title {
   font-size: 28rpx;
-  color: #2d241c;
-  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  display: block;
   margin-bottom: 6rpx;
 }
 
-.bill-note {
+.summary-count {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.5);
   display: block;
-  font-size: 24rpx;
-  color: #a89580;
-  margin-top: 4rpx;
 }
 
-.bill-right {
+.summary-stats {
   display: flex;
   align-items: center;
-  gap: 8rpx;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
 }
 
-.bill-amount {
+.stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 20rpx;
+  color: rgba(255, 255, 255, 0.5);
   display: block;
-  font-size: 32rpx;
+  margin-bottom: 6rpx;
+}
+
+.stat-value {
+  font-size: 30rpx;
+  font-weight: 600;
+  font-family: 'SF Pro Display', -apple-system, sans-serif;
+  display: block;
+}
+
+.stat-value.income {
+  color: #10b981;
+}
+
+.stat-value.expense {
+  color: #ef4444;
+}
+
+.stat-value.net-positive {
+  color: #fbbf24;
+}
+
+.stat-value.net-negative {
+  color: #ef4444;
+}
+
+.stat-divider {
+  width: 1rpx;
+  height: 48rpx;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.summary-net {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 16rpx;
+  border-top: 1rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.summary-net-label {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.summary-net-amount {
+  font-size: 40rpx;
   font-weight: 700;
   font-family: 'SF Pro Display', -apple-system, sans-serif;
 }
 
-.bill-amount.in {
-  color: #10b981;
+.summary-net-amount.net-positive {
+  color: #fbbf24;
 }
 
-.bill-amount.out {
+.summary-net-amount.net-negative {
+  color: #ef4444;
+}
+
+/* ─── Search Bar ─── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 24rpx;
+  background: #ffffff;
+  gap: 12rpx;
+  border-bottom: 1rpx solid #f0ebe5;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.search-input-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  background: #f5f0eb;
+  border-radius: 32rpx;
+  padding: 12rpx 18rpx;
+  transition: all 0.2s ease;
+}
+
+.search-input-wrapper:focus-within {
+  background: #ffffff;
+  box-shadow: 0 0 0 4rpx rgba(245, 158, 11, 0.1);
+}
+
+.search-icon {
+  font-size: 26rpx;
+  margin-right: 10rpx;
+  flex-shrink: 0;
+}
+
+.search-input {
+  flex: 1;
+  font-size: 28rpx;
+  color: #2d241c;
+  line-height: 1.4;
+}
+
+.search-clear {
+  width: 36rpx;
+  height: 36rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #c4b5a5;
+  border-radius: 50%;
+  margin-left: 8rpx;
+  flex-shrink: 0;
+}
+
+.search-clear:active {
+  background: #a89580;
+}
+
+.search-clear-text {
+  font-size: 20rpx;
+  color: #ffffff;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.filter-toggle-btn {
+  padding: 12rpx 24rpx;
+  background: #f5f0eb;
+  border-radius: 28rpx;
+  font-size: 26rpx;
+  color: #8b7355;
+  font-weight: 500;
+  position: relative;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.filter-toggle-btn.active {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.filter-toggle-btn.has-filters {
+  padding-right: 32rpx;
+}
+
+.filter-toggle-btn:active {
+  opacity: 0.8;
+}
+
+.filter-dot {
+  position: absolute;
+  top: 8rpx;
+  right: 8rpx;
+  width: 12rpx;
+  height: 12rpx;
+  background: #ef4444;
+  border-radius: 50%;
+  border: 2rpx solid #ffffff;
+}
+
+.filter-toggle-text {
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+/* ─── Filter Panel ─── */
+.filter-panel {
+  background: #ffffff;
+  border-bottom: 1rpx solid #f0ebe5;
+}
+
+.filter-panel-inner {
+  padding: 24rpx;
+}
+
+.filter-section {
+  margin-bottom: 20rpx;
+}
+
+.filter-section:last-child {
+  margin-bottom: 0;
+}
+
+.filter-section-label {
+  font-size: 24rpx;
+  color: #8b7355;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 12rpx;
+}
+
+/* Category chips */
+.filter-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.cat-chip {
+  padding: 10rpx 20rpx;
+  background: #f5f0eb;
+  border-radius: 20rpx;
+  transition: all 0.2s ease;
+}
+
+.cat-chip.active {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 2rpx 8rpx rgba(245, 158, 11, 0.25);
+}
+
+.cat-chip:active {
+  transform: scale(0.95);
+}
+
+.cat-chip-text {
+  font-size: 24rpx;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+.cat-chip.active .cat-chip-text {
+  color: #ffffff;
+}
+
+/* Date range */
+.filter-date-row {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.filter-date-input {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 20rpx;
+  background: #f5f0eb;
+  border: 2rpx solid #e8e0d8;
+  border-radius: 12rpx;
+  font-size: 24rpx;
   color: #2d241c;
 }
 
-.bill-time {
-  display: block;
-  font-size: 22rpx;
-  color: #a89580;
-  margin-top: 6rpx;
+.filter-date-input:focus {
+  border-color: #f59e0b;
+  background: #ffffff;
 }
 
-/* ===== 加载更多 ===== */
+.filter-date-sep {
+  font-size: 24rpx;
+  color: #a89580;
+  flex-shrink: 0;
+}
+
+/* Direction buttons */
+.filter-direction {
+  display: flex;
+  gap: 12rpx;
+}
+
+.dir-btn {
+  padding: 12rpx 28rpx;
+  background: #f5f0eb;
+  border-radius: 12rpx;
+  transition: all 0.2s ease;
+}
+
+.dir-btn.active {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 2rpx 8rpx rgba(245, 158, 11, 0.25);
+}
+
+.dir-btn:active {
+  transform: scale(0.95);
+}
+
+.dir-btn-text {
+  font-size: 24rpx;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+.dir-btn.active .dir-btn-text {
+  color: #ffffff;
+}
+
+/* Filter action buttons */
+.filter-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 24rpx;
+}
+
+.filter-action-btn {
+  flex: 1;
+  padding: 20rpx;
+  text-align: center;
+  border-radius: 16rpx;
+  transition: all 0.2s ease;
+}
+
+.filter-action-btn.clear {
+  background: #fef2f2;
+}
+
+.filter-action-btn.clear:active {
+  background: #fecaca;
+}
+
+.filter-action-btn.reset {
+  background: #f5f0eb;
+}
+
+.filter-action-btn.reset:active {
+  background: #e8e0d8;
+}
+
+.filter-action-btn.apply {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.3);
+}
+
+.filter-action-btn.apply:active {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+
+.filter-action-text {
+  font-size: 26rpx;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+.filter-action-btn.clear .filter-action-text {
+  color: #ef4444;
+}
+
+.apply-text {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* ─── Scroll Area ─── */
+.bills-scroll {
+  height: calc(100vh - 180rpx);
+}
+
+/* ─── Skeleton Loading ─── */
+.skeleton-container {
+  padding: 16rpx 24rpx;
+}
+
+.skeleton-group {
+  margin-bottom: 16rpx;
+  background: #ffffff;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  overflow: hidden;
+}
+
+.skeleton-group-header {
+  height: 48rpx;
+  background: linear-gradient(90deg, #f0ebe5 25%, #f5f0eb 50%, #f0ebe5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8rpx;
+  margin-bottom: 16rpx;
+}
+
+.skeleton-row {
+  height: 80rpx;
+  background: linear-gradient(90deg, #f0ebe5 25%, #f5f0eb 50%, #f0ebe5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8rpx;
+  margin-bottom: 12rpx;
+}
+
+/* ─── Month Group ─── */
+.month-group {
+  margin: 0 20rpx 16rpx;
+  background: #ffffff;
+  border-radius: 16rpx;
+  overflow: hidden;
+  box-shadow: 0 2rpx 12rpx rgba(45, 36, 28, 0.06);
+}
+
+/* ─── Month Header ─── */
+.month-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  background: linear-gradient(135deg, #faf7f5 0%, #f5f0eb 100%);
+  border-bottom: 1rpx solid #f0ebe5;
+  transition: background 0.2s ease;
+}
+
+.month-header:active {
+  background: #f0ebe5;
+}
+
+.month-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.month-chevron {
+  font-size: 20rpx;
+  color: #f59e0b;
+  transition: transform 0.3s ease;
+  flex-shrink: 0;
+}
+
+.month-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.month-label {
+  font-size: 28rpx;
+  color: #2d241c;
+  font-weight: 600;
+}
+
+.month-count-badge {
+  font-size: 20rpx;
+  color: #f59e0b;
+  background: #fef3c7;
+  padding: 4rpx 12rpx;
+  border-radius: 12rpx;
+  font-weight: 500;
+}
+
+.month-header-right {
+  display: flex;
+  gap: 20rpx;
+}
+
+.month-stat {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.month-stat-label {
+  font-size: 20rpx;
+  color: #a89580;
+}
+
+.month-stat-value {
+  font-size: 22rpx;
+  font-weight: 600;
+  font-family: 'SF Pro Display', -apple-system, sans-serif;
+}
+
+.month-stat-value.income {
+  color: #10b981;
+}
+
+.month-stat-value.expense {
+  color: #ef4444;
+}
+
+.month-stat-value.net-positive {
+  color: #3b82f6;
+}
+
+.month-stat-value.net-negative {
+  color: #ef4444;
+}
+
+/* ─── Month Bills Container ─── */
+.month-bills {
+  overflow: hidden;
+}
+
+/* ─── Bill Row ─── */
+.bill-row {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 24rpx;
+  border-bottom: 1rpx solid #f5f0eb;
+  transition: background 0.15s ease;
+}
+
+.bill-row.even {
+  background: #fefefe;
+}
+
+.bill-row.odd {
+  background: #faf7f5;
+}
+
+.bill-row:active {
+  background: #fef3c7;
+}
+
+.bill-row:last-child {
+  border-bottom: none;
+}
+
+.bill-cell {
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Date cell */
+.date-cell {
+  width: 90rpx;
+  padding-right: 12rpx;
+}
+
+.bill-date-main {
+  font-size: 24rpx;
+  color: #2d241c;
+  font-weight: 500;
+  display: block;
+}
+
+.bill-date-full {
+  font-size: 18rpx;
+  color: #a89580;
+  display: block;
+  margin-top: 2rpx;
+}
+
+/* Category cell */
+.category-cell {
+  width: 90rpx;
+  padding-right: 12rpx;
+}
+
+.bill-category-tag {
+  font-size: 22rpx;
+  color: #8b7355;
+  background: #f5f0eb;
+  padding: 4rpx 12rpx;
+  border-radius: 10rpx;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Payee cell */
+.payee-cell {
+  width: 120rpx;
+  padding-right: 12rpx;
+}
+
+.bill-payee-text {
+  font-size: 24rpx;
+  color: #2d241c;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Description cell */
+.desc-cell {
+  flex: 1;
+  padding-right: 12rpx;
+  min-width: 0;
+}
+
+.bill-desc-text {
+  font-size: 22rpx;
+  color: #a89580;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Amount cell */
+.amount-cell {
+  width: 130rpx;
+  text-align: right;
+  padding-right: 12rpx;
+}
+
+.bill-amount-text {
+  font-size: 28rpx;
+  font-weight: 700;
+  font-family: 'SF Pro Display', -apple-system, sans-serif;
+}
+
+.amount-cell.income .bill-amount-text {
+  color: #10b981;
+}
+
+.amount-cell.expense .bill-amount-text {
+  color: #ef4444;
+}
+
+/* Action cell */
+.action-cell {
+  width: 90rpx;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4rpx;
+}
+
+.bill-action-btn {
+  width: 40rpx;
+  height: 40rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  transition: all 0.15s ease;
+}
+
+.bill-action-btn.edit {
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.bill-action-btn.delete {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.bill-action-btn:active {
+  transform: scale(0.85);
+  opacity: 0.7;
+}
+
+.action-icon {
+  font-size: 20rpx;
+}
+
+/* ─── Bill Edit Row ─── */
+.bill-edit-row {
+  padding: 20rpx 24rpx;
+  background: #fffdf5;
+  border-bottom: 1rpx solid #fde68a;
+}
+
+.edit-row-top {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.edit-row-bottom {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.edit-input {
+  height: 64rpx;
+  padding: 0 16rpx;
+  font-size: 24rpx;
+  background: #ffffff;
+  border: 2rpx solid #e8e0d8;
+  border-radius: 12rpx;
+  color: #2d241c;
+}
+
+.edit-input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 4rpx rgba(245, 158, 11, 0.08);
+}
+
+.edit-date {
+  width: 160rpx;
+  flex-shrink: 0;
+}
+
+.edit-category {
+  width: 130rpx;
+  flex-shrink: 0;
+}
+
+.edit-payee {
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-desc {
+  flex: 1;
+  min-width: 0;
+}
+
+.edit-amount {
+  width: 140rpx;
+  flex-shrink: 0;
+}
+
+/* Direction toggle in edit */
+.edit-direction-row {
+  display: flex;
+  gap: 12rpx;
+  margin-bottom: 12rpx;
+}
+
+.edit-dir-btn {
+  padding: 10rpx 24rpx;
+  background: #f5f0eb;
+  border-radius: 12rpx;
+  transition: all 0.2s ease;
+}
+
+.edit-dir-btn.active {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+}
+
+.edit-dir-btn:active {
+  transform: scale(0.95);
+}
+
+.edit-dir-text {
+  font-size: 24rpx;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+.edit-dir-btn.active .edit-dir-text {
+  color: #ffffff;
+}
+
+/* Edit action buttons */
+.edit-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.edit-save-btn {
+  flex: 1;
+  padding: 18rpx;
+  text-align: center;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  border-radius: 14rpx;
+  box-shadow: 0 4rpx 12rpx rgba(16, 185, 129, 0.25);
+}
+
+.edit-save-btn:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+.edit-save-text {
+  font-size: 26rpx;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.edit-cancel-btn {
+  flex: 1;
+  padding: 18rpx;
+  text-align: center;
+  background: #f5f0eb;
+  border-radius: 14rpx;
+}
+
+.edit-cancel-btn:active {
+  background: #e8e0d8;
+  transform: scale(0.97);
+}
+
+.edit-cancel-text {
+  font-size: 26rpx;
+  color: #8b7355;
+  font-weight: 500;
+}
+
+/* ─── Loading More ─── */
 .loading-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
   padding: 30rpx;
+}
+
+.loading-spinner {
+  width: 32rpx;
+  height: 32rpx;
+  border: 3rpx solid #e8e0d8;
+  border-top-color: #f59e0b;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.loading-text {
+  font-size: 24rpx;
+  color: #a89580;
+}
+
+/* ─── No More Data ─── */
+.no-more {
+  padding: 24rpx;
   text-align: center;
 }
 
-.loading-more text {
-  font-size: 26rpx;
-  color: #a89580;
+.no-more-text {
+  font-size: 22rpx;
+  color: #c4b5a5;
 }
 
-/* ===== 空状态 ===== */
+/* ─── Empty State ─── */
 .empty-state {
-  padding: 120rpx 30rpx;
+  padding: 120rpx 40rpx;
   text-align: center;
 }
 
 .empty-icon {
   font-size: 96rpx;
+  display: block;
   margin-bottom: 24rpx;
+  opacity: 0.6;
 }
 
-.empty-text {
+.empty-title {
   display: block;
   font-size: 30rpx;
   color: #8b7355;
+  font-weight: 500;
   margin-bottom: 12rpx;
 }
 
@@ -180,464 +890,115 @@
   display: block;
   font-size: 26rpx;
   color: #a89580;
+  margin-bottom: 32rpx;
 }
 
-/* ===== 错误状态 ===== */
-.error-state {
-  padding: 120rpx 30rpx;
-  text-align: center;
+.empty-add-btn {
+  width: 320rpx;
+  margin: 0 auto;
 }
 
-.error-state text {
-  font-size: 28rpx;
-  color: #ef4444;
+/* ─── Floating Add Button ─── */
+.floating-add-btn-wrapper {
+  position: fixed;
+  bottom: 30rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
 }
 
-/* ===== 底部添加按钮 ===== */
-.add-bill-footer {
-  padding: 30rpx;
-  padding-bottom: calc(30rpx + env(safe-area-inset-bottom));
-}
-
-.add-bill-btn {
-  width: 100%;
-  height: 88rpx;
+.floating-add-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12rpx;
+  gap: 10rpx;
+  padding: 20rpx 40rpx;
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   border-radius: 44rpx;
-  box-shadow: 0 6rpx 20rpx rgba(245, 158, 11, 0.3);
+  box-shadow: 0 8rpx 28rpx rgba(245, 158, 11, 0.4);
+  transition: all 0.2s ease;
 }
 
-.add-bill-btn:active {
-  transform: scale(0.98);
-  opacity: 0.95;
-  box-shadow: 0 3rpx 10rpx rgba(245, 158, 11, 0.2);
+.floating-add-btn:active {
+  transform: scale(0.96);
+  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.3);
 }
 
-.add-bill-btn::after {
-  border: none;
-}
-
-.add-bill-icon {
-  font-size: 36rpx;
-  color: #ffffff;
-  font-weight: bold;
-}
-
-.add-bill-text {
+.floating-add-icon {
   font-size: 32rpx;
+  color: #ffffff;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.floating-add-text {
+  font-size: 28rpx;
   color: #ffffff;
   font-weight: 600;
 }
 
-/* ===== 搜索提示 ===== */
-.search-hint {
-  padding: 16rpx 20rpx;
-  margin-bottom: 16rpx;
-  background: #eff6ff;
-  border-radius: 12rpx;
+/* ─── Scroll Bottom Spacer (for floating button clearance) ─── */
+.scroll-bottom-spacer {
+  height: 140rpx;
 }
 
-.search-hint-text {
-  font-size: 22rpx;
-  color: #3b82f6;
-}
-
-/* ===== 日期输入框 ===== */
-.date-input {
-  width: 100%;
-  height: 72rpx;
-  padding: 0 20rpx;
-  background: #faf7f5;
-  border: 2rpx solid #e8e0d8;
-  border-radius: 12rpx;
-  font-size: 26rpx;
-  color: #2d241c;
-}
-
-.date-input:focus {
-  border-color: #f59e0b;
-  background: #ffffff;
-}
-
-/* ===== 搜索栏 ===== */
-.search-bar {
-  display: flex;
-  align-items: center;
-  padding: 20rpx 30rpx;
-  background: #ffffff;
-  gap: 16rpx;
-  border-bottom: 1rpx solid #f0ebe5;
-}
-
-.search-input-wrapper {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background: #faf7f5;
-  border-radius: 32rpx;
-  padding: 14rpx 20rpx;
-}
-
-.search-icon {
-  font-size: 28rpx;
-  margin-right: 12rpx;
-  color: #a89580;
-}
-
-.search-input {
-  flex: 1;
-  font-size: 28rpx;
-  color: #2d241c;
-}
-
-.search-clear {
-  width: 40rpx;
-  height: 40rpx;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #c4b5a5;
-  border-radius: 20rpx;
-  margin-left: 12rpx;
-}
-
-.search-clear text {
-  font-size: 24rpx;
-  color: #ffffff;
-}
-
-.filter-btn {
-  padding: 14rpx 24rpx;
-  background: #faf7f5;
-  border-radius: 32rpx;
-  font-size: 26rpx;
-  color: #8b7355;
-  font-weight: 500;
-}
-
-.filter-btn:active {
-  background: #f0ebe5;
-}
-
-/* ===== 筛选面板 ===== */
-.filter-panel {
-  background: #ffffff;
-  padding: 24rpx 30rpx;
-  border-bottom: 1rpx solid #f0ebe5;
-}
-
-.filter-row {
-  display: flex;
-  align-items: center;
-  margin-bottom: 16rpx;
-}
-
-.filter-label {
-  width: 140rpx;
-  font-size: 26rpx;
-  color: #8b7355;
-}
-
-.filter-input {
-  flex: 1;
-  padding: 14rpx 16rpx;
-  background: #faf7f5;
-  border-radius: 12rpx;
-  font-size: 26rpx;
-  color: #2d241c;
-}
-
-.filter-direction {
-  display: flex;
-  gap: 12rpx;
-}
-
-.dir-btn {
-  padding: 12rpx 24rpx;
-  background: #faf7f5;
-  border-radius: 12rpx;
-  font-size: 24rpx;
-  color: #8b7355;
-}
-
-.dir-btn.active {
-  background: #f59e0b;
-  color: #ffffff;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 20rpx;
-  margin-top: 24rpx;
-}
-
-.filter-reset {
-  flex: 1;
-  padding: 22rpx;
-  text-align: center;
-  background: #faf7f5;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: #8b7355;
-}
-
-.filter-apply {
-  flex: 1;
-  padding: 22rpx;
-  text-align: center;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: #ffffff;
-  font-weight: 500;
-}
-
-.filter-reset:active {
-  background: #f0ebe5;
-}
-
-.filter-apply:active {
-  opacity: 0.9;
-}
-
-/* ===== 删除按钮 ===== */
-.bill-delete {
-  padding: 12rpx;
-}
-
-.bill-delete:active {
-  opacity: 0.6;
-}
-
-/* ===== 表格表头 ===== */
-.bill-table-header {
-  display: flex;
-  padding: 20rpx 30rpx;
-  background: #f5f0eb;
-  border-bottom: 1rpx solid #e8e0d8;
-}
-
-.bill-table-header text {
-  font-size: 24rpx;
-  color: #8b7355;
-  font-weight: 500;
-}
-
-.header-date {
-  width: 100rpx;
-}
-
-.header-category {
-  width: 90rpx;
-}
-
-.header-payee {
-  width: 120rpx;
-}
-
-.header-desc {
-  flex: 1;
-  padding: 0 10rpx;
-}
-
-.header-amount {
-  width: 110rpx;
-  text-align: right;
-}
-
-.header-action {
-  width: 80rpx;
+/* ─── Error State ─── */
+.error-state {
+  padding: 120rpx 40rpx;
   text-align: center;
 }
 
-/* ===== 账单行 ===== */
-.bill-item-container {
-  background: #ffffff;
+.error-icon {
+  font-size: 80rpx;
+  display: block;
+  margin-bottom: 20rpx;
 }
 
-.bill-item {
-  display: flex;
-  align-items: center;
-  padding: 24rpx 30rpx;
-  border-bottom: 1rpx solid #f0ebe5;
-}
-
-.bill-item:active {
-  background: #faf7f5;
-}
-
-.bill-date {
-  width: 100rpx;
-  font-size: 22rpx;
-  color: #a89580;
-}
-
-.bill-category-wrapper {
-  width: 90rpx;
-}
-
-.bill-category {
-  font-size: 24rpx;
-  color: #2d241c;
-}
-
-.bill-payee {
-  width: 120rpx;
-  font-size: 24rpx;
-  color: #2d241c;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.bill-desc {
-  flex: 1;
-  font-size: 22rpx;
-  color: #a89580;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 10rpx;
-}
-
-.bill-actions {
-  display: flex;
-  gap: 8rpx;
-  width: 100rpx;
-  justify-content: center;
-}
-
-.bill-edit-btn,
-.bill-delete-btn {
-  padding: 8rpx;
-}
-
-.bill-edit-btn:active,
-.bill-delete-btn:active {
-  opacity: 0.6;
-}
-
-/* ===== 编辑行 ===== */
-.bill-edit-row {
-  display: flex;
-  align-items: center;
-  padding: 16rpx 30rpx;
-  background: #fffdf5;
-  border-bottom: 1rpx solid #f0ebe5;
-  gap: 8rpx;
-}
-
-.edit-input {
-  height: 64rpx;
-  padding: 0 12rpx;
-  font-size: 24rpx;
-  background: #ffffff;
-  border: 2rpx solid #e8e0d8;
-  border-radius: 12rpx;
-}
-
-.edit-date {
-  width: 140rpx;
-}
-
-.edit-category {
-  width: 120rpx;
-}
-
-.edit-payee {
-  flex: 1;
-}
-
-.edit-amount {
-  width: 120rpx;
-}
-
-.edit-actions {
-  display: flex;
-  gap: 8rpx;
-}
-
-.edit-save,
-.edit-cancel {
-  width: 64rpx;
-  height: 64rpx;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  border-radius: 32rpx;
-}
-
-.edit-save {
-  background: #10b981;
-  color: #ffffff;
-}
-
-.edit-cancel {
-  background: #f5f0eb;
-  color: #8b7355;
-}
-
-/* ===== 分类按钮 ===== */
-.filter-category-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12rpx;
-  flex: 1;
-}
-
-.cat-btn {
-  padding: 12rpx 20rpx;
-  background: #faf7f5;
-  border-radius: 20rpx;
-  font-size: 24rpx;
-  color: #8b7355;
-}
-
-.cat-btn.active {
-  background: #f59e0b;
-  color: #ffffff;
-}
-
-.cat-btn:active {
-  opacity: 0.8;
-}
-
-/* ===== 月份选择器 ===== */
-.filter-picker {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14rpx 20rpx;
-  background: #faf7f5;
-  border-radius: 12rpx;
-  min-width: 200rpx;
-}
-
-.filter-picker text {
-  font-size: 26rpx;
-  color: #2d241c;
-}
-
-.picker-arrow {
-  font-size: 20rpx;
-  color: #a89580;
-}
-
-/* ===== 清除全部按钮 ===== */
-.filter-clear {
-  flex: 1;
-  padding: 22rpx;
-  text-align: center;
-  background: #fef2f2;
-  border-radius: 16rpx;
+.error-text {
+  display: block;
   font-size: 28rpx;
   color: #ef4444;
+  margin-bottom: 24rpx;
 }
 
-.filter-clear:active {
-  background: #fecaca;
+.retry-btn {
+  width: 280rpx;
+  margin: 0 auto;
+}
+
+/* ─── Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }

@@ -1,0 +1,139 @@
+/* 结构化内容块渲染器样式 — 对齐网页端 ContentBlockRenderer */
+
+.content-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;
+  width: 100%;
+}
+
+/* 文本块 */
+.cb-text { width: 100%; }
+.cb-text-content {
+  font-size: 26rpx;
+  color: #2d241c;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* 标题块 */
+.cb-heading {
+  width: 100%;
+  padding: 8rpx 0;
+}
+.cb-heading-1 .cb-heading-text { font-size: 36rpx; font-weight: 700; }
+.cb-heading-2 .cb-heading-text { font-size: 30rpx; font-weight: 600; }
+.cb-heading-3 .cb-heading-text { font-size: 26rpx; font-weight: 600; }
+.cb-heading-text { color: #2d241c; }
+
+/* 汇总卡片 */
+.cb-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12rpx;
+  width: 100%;
+}
+.cb-summary-card {
+  background: #faf7f5;
+  border-radius: 12rpx;
+  padding: 16rpx;
+  text-align: center;
+}
+.cb-summary-value {
+  font-size: 28rpx;
+  font-weight: 700;
+  color: #f59e0b;
+  display: block;
+}
+.cb-summary-label {
+  font-size: 22rpx;
+  color: #8b7355;
+  margin-top: 4rpx;
+  display: block;
+}
+
+/* 表格 */
+.cb-table {
+  width: 100%;
+  border-radius: 12rpx;
+  overflow: hidden;
+  border: 1rpx solid #e8e0d8;
+}
+.cb-table-header {
+  display: flex;
+  background: #faf7f5;
+  padding: 12rpx 0;
+}
+.cb-table-header-cell {
+  flex: 1;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #5a4a3a;
+  text-align: center;
+}
+.cb-table-row {
+  display: flex;
+  padding: 10rpx 0;
+  border-top: 1rpx solid #f0ebe5;
+}
+.cb-table-row.even { background: #faf7f5; }
+.cb-table-cell {
+  flex: 1;
+  font-size: 22rpx;
+  color: #2d241c;
+  text-align: center;
+  padding: 0 8rpx;
+}
+
+/* 账单列表 */
+.cb-bill-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+.cb-bill-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12rpx;
+  background: #faf7f5;
+  border-radius: 10rpx;
+}
+.cb-bill-left { flex: 1; display: flex; flex-wrap: wrap; gap: 8rpx; align-items: center; }
+.cb-bill-date { font-size: 20rpx; color: #a89580; }
+.cb-bill-category {
+  font-size: 20rpx;
+  color: #f59e0b;
+  background: #fffbeb;
+  padding: 2rpx 8rpx;
+  border-radius: 6rpx;
+}
+.cb-bill-payee { font-size: 22rpx; color: #5a4a3a; }
+.cb-bill-amount { font-size: 26rpx; font-weight: 600; }
+.cb-bill-amount.expense { color: #ef4444; }
+.cb-bill-amount.income { color: #10b981; }
+
+/* 提示块 */
+.cb-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  padding: 16rpx;
+  border-radius: 12rpx;
+  width: 100%;
+  box-sizing: border-box;
+}
+.cb-callout-info { background: #eff6ff; }
+.cb-callout-warning { background: #fffbeb; }
+.cb-callout-success { background: #f0fdf4; }
+.cb-callout-icon { font-size: 24rpx; }
+.cb-callout-content { font-size: 24rpx; color: #2d241c; flex: 1; line-height: 1.5; }
+
+/* 分割线 */
+.cb-divider {
+  width: 100%;
+  height: 1rpx;
+  background: #e8e0d8;
+  margin: 8rpx 0;
+}

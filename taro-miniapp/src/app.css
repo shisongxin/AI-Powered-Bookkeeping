@@ -1,11 +1,11 @@
-/* ===== 全局样式 — Design Tokens ===== */
+/* ===== 全局样式 — Design Tokens (aligned with web/) ===== */
 view, text {
   box-sizing: border-box;
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', -apple-system, sans-serif;
 }
 
 page {
-  /* 温暖的奶油色背景 */
+  /* 温暖的奶油色背景 — web/ #faf7f5 */
   background-color: #faf7f5;
   min-height: 100vh;
   color: #2d241c;
@@ -20,18 +20,17 @@ page {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ===== 色彩系统 ===== */
-/* 主色调 - 金色 */
+/* ===== 色彩系统 (aligned with web/ Tailwind palette) ===== */
+/* 主色调 — 金色 gold-500/600 */
 .color-gold { color: #f59e0b; }
 .color-gold-light { color: #fbbf24; }
 .color-gold-dark { color: #d97706; }
 
-/* 背景色 */
 .bg-gold { background-color: #f59e0b; }
 .bg-gold-light { background-color: #fbbf24; }
 .bg-gold-gradient { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); }
 
-/* 咖啡色 - 文字层级 */
+/* 咖啡色 — 文字层级 (espresso-50–950) */
 .color-espresso { color: #2d241c; }
 .color-espresso-600 { color: #4a3f35; }
 .color-espresso-500 { color: #8b7355; }
@@ -43,7 +42,6 @@ page {
 .color-expense { color: #ef4444; }
 .color-balance { color: #3b82f6; }
 
-/* 背景色 */
 .bg-income { background-color: #ecfdf5; }
 .bg-expense { background-color: #fef2f2; }
 .bg-balance { background-color: #eff6ff; }
@@ -60,9 +58,10 @@ page {
   background: rgba(255, 255, 255, 0.85);
   border-radius: 20rpx;
   box-shadow: 0 2rpx 16rpx rgba(45, 36, 28, 0.08);
+  backdrop-fill: blur(10rpx);
 }
 
-/* ===== 统计卡片 ===== */
+/* ===== 统计卡片 (aligned with web/ stat-card) ===== */
 .stat-card {
   position: relative;
   overflow: hidden;
@@ -100,7 +99,7 @@ page {
   background: linear-gradient(135deg, #f5f3ff 0%, #ddd6fe 100%);
 }
 
-/* ===== 按钮样式 ===== */
+/* ===== 按钮样式 (aligned with web/ btn-primary/secondary/ghost) ===== */
 .btn-primary {
   width: 100%;
   height: 88rpx;
@@ -144,7 +143,21 @@ page {
   border-color: #c4b5a5;
 }
 
-/* ===== 输入框样式 ===== */
+.btn-ghost {
+  background: transparent;
+  color: #8b7355;
+  font-size: 28rpx;
+  padding: 12rpx 24rpx;
+  border: none;
+  border-radius: 12rpx;
+  transition: all 0.2s ease;
+}
+
+.btn-ghost:active {
+  background: rgba(139, 115, 85, 0.08);
+}
+
+/* ===== 输入框样式 (aligned with web/ .input-field) ===== */
 .input-field {
   width: 100%;
   padding: 24rpx;
@@ -159,6 +172,7 @@ page {
 .input-field:focus {
   border-color: #f59e0b;
   background: #ffffff;
+  box-shadow: 0 0 0 6rpx rgba(245, 158, 11, 0.1);
 }
 
 .input-field::placeholder {
@@ -209,7 +223,7 @@ page {
   margin: 0 30rpx;
 }
 
-/* ===== 标签 ===== */
+/* ===== 标签 (aligned with web/ .badge) ===== */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -292,7 +306,7 @@ page {
 .mb-3 { margin-bottom: 24rpx; }
 .mx-auto { margin-left: auto; margin-right: auto; }
 
-/* ===== 动画 ===== */
+/* ===== 动画 (aligned with web/ animations) ===== */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -303,9 +317,19 @@ page {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
+}
+
+@keyframes pulseSoft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .animate-fade-in {
@@ -314,6 +338,14 @@ page {
 
 .animate-slide-up {
   animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-pulse-soft {
+  animation: pulseSoft 1.5s ease-in-out infinite;
 }
 
 .skeleton {
@@ -345,4 +377,52 @@ page {
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 50%;
+}
+
+/* ===== 页面进入动画 ===== */
+.page-enter {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ===== 交错子元素动画 ===== */
+.stagger-children > view:nth-child(1) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.00s both; }
+.stagger-children > view:nth-child(2) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
+.stagger-children > view:nth-child(3) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.10s both; }
+.stagger-children > view:nth-child(4) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+.stagger-children > view:nth-child(5) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.20s both; }
+.stagger-children > view:nth-child(6) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both; }
+
+/* ===== 聊天气泡 (aligned with web/ chat-bubble) ===== */
+.chat-bubble-user {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #ffffff;
+  border-radius: 24rpx 24rpx 8rpx 24rpx;
+  padding: 20rpx 28rpx;
+  max-width: 80%;
+  margin-left: auto;
+  box-shadow: 0 4rpx 12rpx rgba(245, 158, 11, 0.2);
+}
+
+.chat-bubble-ai {
+  background: rgba(255, 255, 255, 0.9);
+  color: #2d241c;
+  border-radius: 24rpx 24rpx 24rpx 8rpx;
+  padding: 20rpx 28rpx;
+  max-width: 80%;
+  box-shadow: 0 2rpx 8rpx rgba(45, 36, 28, 0.06);
+  border: 1rpx solid #f0ebe5;
+}
+
+/* ===== 确认卡片 (aligned with web/ confirm-card) ===== */
+.confirm-card {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-radius: 20rpx;
+  padding: 28rpx;
+  border: 2rpx solid #fbbf24;
+  animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ===== 暗色渐变背景 (aligned with web/ espresso sidebar) ===== */
+.bg-dark-gradient {
+  background: linear-gradient(135deg, #2d241c 0%, #1c1917 100%);
 }

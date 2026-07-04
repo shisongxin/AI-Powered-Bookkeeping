@@ -61,21 +61,6 @@
   margin-bottom: 40rpx;
 }
 
-/* ===== 演示提示 ===== */
-.demo-hint {
-  padding: 16rpx 24rpx;
-  margin-bottom: 24rpx;
-  background: #eff6ff;
-  border: 1rpx solid #bfdbfe;
-  border-radius: 16rpx;
-  text-align: center;
-}
-
-.demo-hint-text {
-  font-size: 24rpx;
-  color: #3b82f6;
-}
-
 /* ===== 微信登录按钮 ===== */
 .wechat-login-btn {
   width: 100%;
@@ -204,4 +189,29 @@
 .wechat-desc-text {
   font-size: 24rpx;
   color: #a89580;
+}
+
+/* ===== 注册入口 ===== */
+.register-entry {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20rpx 0;
+  margin-bottom: 20rpx;
+}
+
+.register-text {
+  font-size: 26rpx;
+  color: #a89580;
+}
+
+.register-link {
+  font-size: 26rpx;
+  color: #f59e0b;
+  font-weight: 600;
+  margin-left: 8rpx;
+}
+
+.register-link:active {
+  opacity: 0.7;
 }

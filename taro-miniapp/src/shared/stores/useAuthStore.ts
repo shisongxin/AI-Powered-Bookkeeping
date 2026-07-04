@@ -1,34 +1,42 @@
+/**
+ * 认证状态管理 Store
+ * 统一网页端和小程序端的账号体系：
+ * - 网页端：用户名密码注册/登录 → JWT
+ * - 小程序端：微信 openid 登录 或 用户名密码登录 → 同一 JWT 体系
+ * - 两端共享同一用户表，数据完全互通
+ */
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-// 尝试导入 Taro（小程序环境可用，Web 端可能失败）
+// 尝试导入 Taro（小程序环境可用，H5 端可能失败）
 let Taro: any = null
 try {
   Taro = require('@tarojs/taro')
 } catch (e) {
-  // Web 端无 Taro，忽略
+  // H5 端无 Taro，忽略
 }
 
+/** 用户信息 — 与后端 User 模型对齐 */
 export interface User {
   id: number
-  openid?: string
-  nickname: string
+  username?: string
+  email?: string | null
+  openid?: string | null
+  nickname?: string
   avatar_url?: string
-  phone?: string
+  is_active?: boolean
   created_at?: string
-  updated_at?: string
 }
 
 interface AuthState {
   user: User | null
   token: string | null
-  refreshToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
-  login: (params: { token: string; refreshToken: string; user: User }) => Promise<void>
+  login: (params: { token: string; user: User }) => Promise<void>
   logout: () => void
-  refresh: () => Promise<void>
+  setUser: (user: User) => void
   checkAuth: () => void
   clearError: () => void
 }
@@ -67,21 +75,13 @@ const createSafeStorage = () => {
     if (typeof localStorage !== 'undefined') {
       return {
         getItem: (name: string) => {
-          try {
-            return localStorage.getItem(name)
-          } catch (e) {
-            return null
-          }
+          try { return localStorage.getItem(name) } catch (e) { return null }
         },
         setItem: (name: string, value: any) => {
-          try {
-            localStorage.setItem(name, value)
-          } catch (e) { /* ignore */ }
+          try { localStorage.setItem(name, value) } catch (e) { /* ignore */ }
         },
         removeItem: (name: string) => {
-          try {
-            localStorage.removeItem(name)
-          } catch (e) { /* ignore */ }
+          try { localStorage.removeItem(name) } catch (e) { /* ignore */ }
         }
       }
     }
@@ -96,27 +96,22 @@ const createSafeStorage = () => {
   }
 }
 
-/**
- * 认证状态管理 store
- */
+/** 认证状态管理 — 持久化到本地存储 */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
-      // 初始状态
       user: null,
       token: null,
-      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
 
-      // 登录
-      login: async (params: { token: string; refreshToken: string; user: User }) => {
+      /** 登录成功 — 存储 token 和用户信息 */
+      login: async (params: { token: string; user: User }) => {
         set({ isLoading: true, error: null })
         try {
           set({
             token: params.token,
-            refreshToken: params.refreshToken,
             user: params.user,
             isAuthenticated: true,
             isLoading: false
@@ -127,30 +122,22 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 登出
+      /** 登出 — 清除所有认证状态 */
       logout: () => {
         set({
           user: null,
           token: null,
-          refreshToken: null,
           isAuthenticated: false,
           error: null
         })
       },
 
-      // 刷新 token
-      refresh: async () => {
-        const { refreshToken } = get()
-        if (!refreshToken) return
-        try {
-          // TODO: 调用刷新 token 的 API
-          console.log('Refresh token:', refreshToken)
-        } catch (e: any) {
-          set({ error: e.message || '刷新失败' })
-        }
+      /** 更新用户信息（如从 /auth/me 获取最新数据） */
+      setUser: (user: User) => {
+        set({ user })
       },
 
-      // 检查认证状态
+      /** 检查认证状态 */
       checkAuth: () => {
         const { token, user } = get()
         if (token && user) {
@@ -158,7 +145,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      // 清除错误
+      /** 清除错误 */
       clearError: () => {
         set({ error: null })
       }

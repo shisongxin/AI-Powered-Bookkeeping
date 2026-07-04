@@ -1,29 +1,32 @@
 export default {
   pages: [
-    'pages/index/index',
+    'pages/analysis/index',
     'pages/bills/list',
     'pages/bills/add',
-    'pages/bills/detail',
-    'pages/analysis/index',
+    'pages/bills/detail/index',
+    'pages/chat/index',
+    'pages/categories/index',
     'pages/mine/index',
-    'pages/login/index'
+    'pages/login/index',
+    'pages/register/index',
+    'pages/budget/index'
   ],
   window: {
     backgroundTextStyle: 'light',
     navigationBarBackgroundColor: '#ffffff',
     navigationBarTitleText: 'AI记账',
     navigationBarTextStyle: 'black',
-    backgroundColor: '#f5f5f5'
+    backgroundColor: '#faf7f5'
   },
   tabBar: {
     color: '#999999',
-    selectedColor: '#07c160',
+    selectedColor: '#fbbf24',
     backgroundColor: '#ffffff',
     borderStyle: 'white',
     list: [
-      { pagePath: 'pages/index/index', text: '首页' },
-      { pagePath: 'pages/bills/list', text: '账单' },
-      { pagePath: 'pages/analysis/index', text: '分析' },
+      { pagePath: 'pages/analysis/index', text: '流水分析' },
+      { pagePath: 'pages/bills/list', text: '账单明细' },
+      { pagePath: 'pages/chat/index', text: 'AI记账' },
       { pagePath: 'pages/mine/index', text: '我的' }
     ]
   },

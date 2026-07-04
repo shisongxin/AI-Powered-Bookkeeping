@@ -1,195 +1,208 @@
-/* 首页样式 — 仿 Web 端深色+金色风格 */
+/* ============================================================
+   首页 (Dashboard) 样式 — 仿 Web/ Dashboard.tsx
+   Monthly financial overview at a glance
+   ============================================================ */
+
 .home-container {
   min-height: 100vh;
   padding: 24rpx;
+  padding-bottom: 160rpx;
   background: #faf7f5;
+  position: relative;
 }
 
-/* ===== 用户卡片 ===== */
-.user-card {
+/* ===== Header ===== */
+.dashboard-header {
   display: flex;
-  align-items: center;
-  padding: 40rpx 36rpx;
-  background: linear-gradient(135deg, #2d241c 0%, #1c1917 100%);
-  border-radius: 24rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 8rpx 32rpx rgba(45, 36, 28, 0.2);
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 32rpx 8rpx 24rpx;
+  margin-bottom: 8rpx;
 }
 
-.user-avatar {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 48rpx;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+.header-left {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-right: 28rpx;
-  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.4);
+  flex-direction: column;
 }
 
-.user-avatar-text {
+.header-title {
   font-size: 44rpx;
-  color: #ffffff;
-  font-weight: bold;
+  font-weight: 700;
+  color: #2d241c;
+  letter-spacing: -0.5rpx;
 }
 
-.user-info {
-  flex: 1;
+.header-subtitle {
+  font-size: 26rpx;
+  color: #a89580;
+  margin-top: 4rpx;
 }
 
-.greeting {
-  display: block;
-  font-size: 34rpx;
-  font-weight: 600;
-  color: #ffffff;
-  margin-bottom: 6rpx;
+.header-right {
+  text-align: right;
 }
 
-.date {
-  display: block;
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.6);
-}
-
-/* ===== 统计卡片 ===== */
+/* ===== Stats Grid (2-col mobile, 4-col desktop equivalent) ===== */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16rpx;
   margin-bottom: 24rpx;
 }
 
-.stat-card-mini {
-  padding: 28rpx 20rpx;
-  background: #ffffff;
+/* ===== Stat Card ===== */
+.stat-card {
+  position: relative;
+  overflow: hidden;
   border-radius: 20rpx;
-  box-shadow: 0 2rpx 12rpx rgba(45, 36, 28, 0.06);
-  text-align: center;
-  transition: all 0.2s ease;
+  padding: 28rpx 24rpx;
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.stat-card-mini:active {
+.stat-card:active {
   transform: scale(0.97);
+  opacity: 0.95;
 }
 
-.stat-card-mini.income {
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-}
-
-.stat-card-mini.expense {
-  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
-}
-
-.stat-card-mini.balance {
-  background: linear-gradient(135deg, #f5f3ff 0%, #ddd6fe 100%);
-}
-
-.stat-icon {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 28rpx;
+.stat-card-header {
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  margin: 0 auto 12rpx;
-}
-
-.stat-icon-income {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-}
-
-.stat-icon-expense {
-  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-}
-
-.stat-icon-balance {
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-}
-
-.stat-icon text {
-  font-size: 28rpx;
-  color: #ffffff;
+  margin-bottom: 16rpx;
 }
 
 .stat-label {
-  display: block;
   font-size: 22rpx;
+  font-weight: 500;
   color: #8b7355;
-  margin-bottom: 8rpx;
+  text-transform: uppercase;
+  letter-spacing: 0.5rpx;
 }
 
-.stat-value-mini {
+.stat-icon-wrapper {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 16rpx;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.stat-icon-income {
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.stat-icon-expense {
+  background: rgba(239, 68, 68, 0.12);
+}
+
+.stat-icon-balance {
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.stat-icon-total {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.stat-icon-text {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #2d241c;
+}
+
+.stat-value {
   display: block;
-  font-size: 32rpx;
+  font-size: 40rpx;
   font-weight: 700;
   color: #2d241c;
   font-family: 'SF Pro Display', -apple-system, sans-serif;
+  line-height: 1.2;
 }
 
-.stat-value-mini.income {
-  color: #10b981;
+.stat-unit {
+  display: block;
+  font-size: 22rpx;
+  color: #a89580;
+  margin-top: 4rpx;
 }
 
-.stat-value-mini.expense {
-  color: #ef4444;
-}
-
-.stat-value-mini.balance {
-  color: #8b5cf6;
-}
-
-/* ===== 快速记账按钮 ===== */
-.quick-add-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32rpx;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+/* ===== Glass Card ===== */
+.card-glass {
+  background: rgba(255, 255, 255, 0.85);
   border-radius: 24rpx;
+  box-shadow: 0 2rpx 16rpx rgba(45, 36, 28, 0.08);
+  padding: 32rpx;
   margin-bottom: 24rpx;
-  box-shadow: 0 8rpx 24rpx rgba(245, 158, 11, 0.35);
-  transition: all 0.2s ease;
+  backdrop-fill: blur(10rpx);
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-.quick-add-btn:active {
-  transform: scale(0.97);
-  opacity: 0.95;
-  box-shadow: 0 4rpx 12rpx rgba(245, 158, 11, 0.25);
+/* ===== Category Breakdown ===== */
+.category-card {
+  /* inherits card-glass */
 }
 
-.quick-add-icon {
-  font-size: 44rpx;
-  color: #ffffff;
-  margin-right: 16rpx;
-  font-weight: bold;
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
-.quick-add-text {
-  color: #ffffff;
-  font-size: 34rpx;
-  font-weight: 600;
+.category-item {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ===== 最近账单 ===== */
-.recent-bills {
-  padding: 32rpx;
-  background: #ffffff;
-  border-radius: 24rpx;
-  box-shadow: 0 2rpx 12rpx rgba(45, 36, 28, 0.06);
+.category-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.category-name {
+  font-size: 26rpx;
+  color: #4a3f35;
+  font-weight: 500;
+}
+
+.category-amount {
+  font-size: 24rpx;
+  color: #8b7355;
+  font-weight: 500;
+  font-family: 'SF Pro Display', -apple-system, sans-serif;
+}
+
+.category-progress-track {
+  height: 12rpx;
+  background: #f0ebe5;
+  border-radius: 6rpx;
+  overflow: hidden;
+  margin-bottom: 6rpx;
+}
+
+.category-progress-fill {
+  height: 100%;
+  border-radius: 6rpx;
+  background: linear-gradient(90deg, #fbbf24, #f59e0b);
+  transition: width 0.7s ease;
+}
+
+.category-pct {
+  font-size: 20rpx;
+  color: #a89580;
+  text-align: right;
+}
+
+/* ===== Recent Bills ===== */
+.bills-card {
+  /* inherits card-glass */
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24rpx;
-}
-
-.section-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: #2d241c;
+  margin-bottom: 16rpx;
 }
 
 .view-all {
@@ -202,31 +215,53 @@
   opacity: 0.7;
 }
 
-/* 账单列表 */
+.bills-empty {
+  padding: 60rpx 0;
+  text-align: center;
+}
+
+.bills-empty-icon {
+  display: block;
+  font-size: 64rpx;
+  margin-bottom: 16rpx;
+  opacity: 0.4;
+}
+
+.bills-empty-text {
+  display: block;
+  font-size: 26rpx;
+  color: #a89580;
+}
+
+/* Bill list */
 .bill-list {
-  margin-top: 8rpx;
+  display: flex;
+  flex-direction: column;
 }
 
 .bill-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24rpx 0;
-  border-bottom: 1rpx solid #f0ebe5;
-}
-
-.bill-item:last-child {
-  border-bottom: none;
+  padding: 24rpx 16rpx;
+  margin: 0 -16rpx;
+  border-radius: 16rpx;
+  transition: background-color 0.15s ease;
 }
 
 .bill-item:active {
-  opacity: 0.7;
+  background-color: rgba(139, 115, 85, 0.05);
+}
+
+.bill-item:not(:last-child) {
+  border-bottom: 1rpx solid #f5f0eb;
 }
 
 .bill-left {
   display: flex;
   align-items: center;
   flex: 1;
+  min-width: 0;
 }
 
 .bill-icon {
@@ -238,6 +273,7 @@
   background: #faf7f5;
   border-radius: 50%;
   margin-right: 20rpx;
+  flex-shrink: 0;
 }
 
 .bill-icon text {
@@ -246,55 +282,64 @@
 
 .bill-info {
   flex: 1;
+  min-width: 0;
 }
 
-.bill-category {
+.bill-payee {
   display: block;
   font-size: 28rpx;
   color: #2d241c;
   font-weight: 500;
-  margin-bottom: 6rpx;
-}
-
-.bill-note {
-  display: block;
-  font-size: 24rpx;
-  color: #a89580;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 300rpx;
-}
-
-.bill-right {
-  text-align: right;
-}
-
-.bill-amount {
-  display: block;
-  font-size: 32rpx;
-  font-weight: 700;
   margin-bottom: 6rpx;
-  font-family: 'SF Pro Display', -apple-system, sans-serif;
 }
 
-.bill-amount.in {
-  color: #10b981;
+.bill-meta {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
 }
 
-.bill-amount.out {
-  color: #ef4444;
+.bill-category-badge {
+  display: inline-block;
+  font-size: 20rpx;
+  font-weight: 500;
+  color: #92400e;
+  background: #fef3c7;
+  padding: 4rpx 14rpx;
+  border-radius: 20rpx;
 }
 
-.bill-time {
-  display: block;
+.bill-date {
   font-size: 22rpx;
   color: #a89580;
 }
 
-/* ===== 空状态 ===== */
-.empty-state {
-  padding: 80rpx 0;
+.bill-amount {
+  font-size: 30rpx;
+  font-weight: 700;
+  font-family: 'SF Pro Display', -apple-system, sans-serif;
+  flex-shrink: 0;
+  margin-left: 24rpx;
+}
+
+.bill-amount-negative {
+  color: #ef4444;
+}
+
+.bill-amount-positive {
+  color: #10b981;
+}
+
+/* ===== Empty State (full page) ===== */
+.empty-state-full {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 160rpx 60rpx;
   text-align: center;
 }
 
@@ -306,30 +351,106 @@
 
 .empty-text {
   display: block;
-  font-size: 28rpx;
-  color: #8b7355;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #2d241c;
   margin-bottom: 12rpx;
 }
 
 .empty-hint {
   display: block;
-  font-size: 24rpx;
+  font-size: 26rpx;
   color: #a89580;
+  line-height: 1.6;
+  max-width: 500rpx;
 }
 
 .empty-login-btn {
   display: inline-block;
-  margin-top: 32rpx;
-  padding: 24rpx 64rpx;
+  margin-top: 48rpx;
+  padding: 28rpx 80rpx;
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
   color: #ffffff;
-  font-size: 28rpx;
+  font-size: 30rpx;
   font-weight: 600;
-  border-radius: 40rpx;
-  box-shadow: 0 6rpx 20rpx rgba(245, 158, 11, 0.3);
+  border-radius: 44rpx;
+  box-shadow: 0 8rpx 24rpx rgba(245, 158, 11, 0.3);
+  border: none;
+  line-height: 1.4;
 }
 
 .empty-login-btn:active {
   transform: scale(0.97);
-  opacity: 0.9;
+  opacity: 0.95;
+  box-shadow: 0 4rpx 12rpx rgba(245, 158, 11, 0.2);
 }
+
+/* ===== Floating Quick-Add Button ===== */
+.quick-add-fab {
+  position: fixed;
+  bottom: 60rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24rpx 48rpx;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border-radius: 48rpx;
+  box-shadow: 0 12rpx 36rpx rgba(245, 158, 11, 0.4);
+  z-index: 100;
+  transition: all 0.2s ease;
+}
+
+.quick-add-fab:active {
+  transform: translateX(-50%) scale(0.96);
+  box-shadow: 0 6rpx 20rpx rgba(245, 158, 11, 0.3);
+  opacity: 0.95;
+}
+
+.quick-add-fab-icon {
+  font-size: 36rpx;
+  color: #ffffff;
+  font-weight: bold;
+  margin-right: 12rpx;
+}
+
+.quick-add-fab-text {
+  color: #ffffff;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+/* ===== Skeleton Loading ===== */
+.skeleton-card {
+  background: linear-gradient(90deg, #f0ebe5 25%, #f5f0eb 50%, #f0ebe5 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 20rpx;
+  height: 160rpx;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ===== Animations ===== */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Staggered children animations ===== */
+.stagger-children > view:nth-child(1) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.00s both; }
+.stagger-children > view:nth-child(2) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both; }
+.stagger-children > view:nth-child(3) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.10s both; }
+.stagger-children > view:nth-child(4) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both; }
+.stagger-children > view:nth-child(5) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.20s both; }
+.stagger-children > view:nth-child(6) { animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both; }

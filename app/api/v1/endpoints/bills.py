@@ -115,6 +115,18 @@ def upload_bill_file(
             logger.warning(f"临时文件删除失败: {temp_path}")
 
 
+@router.get("/{bill_id}", response_model=BillResponse)
+def get_bill(bill_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+    """获取单个账单详情（仅可查看自己的账单）"""
+    service = BillService(db)
+    bill = service.get_bill_by_id(bill_id)
+    if not bill:
+        raise HTTPException(status_code=404, detail="账单不存在")
+    if bill.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="无权查看此账单")
+    return bill
+
+
 @router.put("/{bill_id}", response_model=BillResponse)
 def update_bill(bill_id: int, data: BillUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     """更新指定账单的部分字段（仅可更新自己的账单）"""

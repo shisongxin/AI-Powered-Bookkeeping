@@ -1,66 +1,73 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { View, Text, ScrollView, Button } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { useAuth } from '../../shared/hooks/useAuth'
-import { useDidShow } from '@tarojs/taro'
-import { getMonthlySummary, getBills } from '../../shared/api/client'
+import { getMonthlySummary, getBills, getCategoryBreakdown } from '../../shared/api/client'
+import { useDataStore } from '../../shared/stores/useDataStore'
 import './index.css'
 
 const HomePage: React.FC = () => {
-  const { user } = useAuth()
-  const [stats, setStats] = useState({
-    totalIncome: 0,
-    totalExpense: 0,
-    balance: 0,
-    transactionCount: 0
-  })
-  const [refreshing, setRefreshing] = useState(false)
+  const { isAuthenticated } = useAuth()
+  const billsVersion = useDataStore((s) => s.billsVersion)
+  const lastVersionRef = useRef(billsVersion)
+  const [summary, setSummary] = useState<{
+    income: number
+    expense: number
+    net: number
+    transaction_count: number
+  } | null>(null)
   const [recentBills, setRecentBills] = useState<any[]>([])
+  const [categoryBreakdown, setCategoryBreakdown] = useState<Array<{ category: string; amount: number; percentage: number }>>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  // 未登录时显示空数据，用户可手动点击登录
-  const isLoggedIn = !!Taro.getStorageSync('token')
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+
+  // 计算分类支出占比
+  const totalCategoryExpense = useMemo(
+    () => categoryBreakdown.reduce((s, c) => s + c.amount, 0),
+    [categoryBreakdown]
+  )
 
   const loadData = useCallback(async () => {
-    if (!isLoggedIn) {
+    if (!isAuthenticated) {
       setLoading(false)
       return
     }
     try {
-      const now = new Date()
-      const year = now.getFullYear()
-      const month = now.getMonth() + 1
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+      const lastDay = new Date(year, month, 0).getDate()
+      const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
-      // 并行加载统计数据和最近账单
-      const [summary, bills] = await Promise.all([
+      const [summaryRes, billsRes, breakdownRes] = await Promise.all([
         getMonthlySummary(year, month),
-        getBills({ limit: 10, order: 'desc' })
+        getBills({ limit: 10, order: 'transaction_date desc' }),
+        getCategoryBreakdown(startDate, endDate, '支出').catch(() => [])
       ])
-
-      setStats({
-        totalIncome: summary.income,
-        totalExpense: summary.expense,
-        balance: summary.net,
-        transactionCount: summary.transaction_count
-      })
-      setRecentBills(bills)
+      setSummary(summaryRes)
+      setRecentBills(billsRes || [])
+      setCategoryBreakdown(breakdownRes || [])
     } catch (error: any) {
       console.error('加载数据失败:', error)
     } finally {
       setLoading(false)
     }
-  }, [isLoggedIn])
+  }, [isAuthenticated, year, month])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  // 页面重新显示时刷新数据（如从登录页返回）
   useDidShow(() => {
-    const token = Taro.getStorageSync('token')
-    if (token) {
-      setLoading(true)
-      loadData()
+    if (isAuthenticated) {
+      // 版本变化时（账单增删改）强制刷新；首次进入也刷新
+      if (billsVersion !== lastVersionRef.current) {
+        lastVersionRef.current = billsVersion
+        setLoading(true)
+        loadData()
+      }
     }
   })
 
@@ -71,106 +78,178 @@ const HomePage: React.FC = () => {
     Taro.showToast({ title: '刷新成功', icon: 'success', duration: 1000 })
   }, [loadData])
 
-  const handleQuickAdd = useCallback(() => {
-    Taro.navigateTo({ url: '/pages/bills/add' })
+  const handleAIChat = useCallback(() => {
+    Taro.switchTab({ url: '/pages/chat/index' })
+  }, [])
+
+  const handleViewAll = useCallback(() => {
+    Taro.switchTab({ url: '/pages/bills/list' })
   }, [])
 
   const handleViewBill = useCallback((id: number) => {
-    Taro.navigateTo({ url: `/pages/bills/detail?id=${id}` })
+    Taro.navigateTo({ url: `/pages/bills/detail/index?id=${id}` })
   }, [])
 
-  const userName = user?.nickname || '用户'
-  const now = new Date()
-  const dateStr = now.toLocaleDateString('zh-CN', {
-    month: 'long',
-    day: 'numeric',
-    weekday: 'long'
-  })
+  const handleLogin = useCallback(() => {
+    Taro.navigateTo({ url: '/pages/login/index' })
+  }, [])
 
+  // Skeleton loading state
   if (loading) {
     return (
       <View className='home-container'>
-        {/* 骨架屏 */}
-        <View className='skeleton-card' style={{ height: '180rpx', marginBottom: '24rpx' }} />
-        <View style={{ display: 'flex', gap: '16rpx', marginBottom: '24rpx' }}>
-          <View className='skeleton-card' style={{ flex: 1, height: '160rpx' }} />
-          <View className='skeleton-card' style={{ flex: 1, height: '160rpx' }} />
-          <View className='skeleton-card' style={{ flex: 1, height: '160rpx' }} />
+        {/* Header skeleton */}
+        <View className='skeleton-card' style={{ height: '120rpx', marginBottom: '24rpx' }} />
+        {/* Stat cards skeleton */}
+        <View className='stats-grid'>
+          <View className='skeleton-card' style={{ height: '180rpx' }} />
+          <View className='skeleton-card' style={{ height: '180rpx' }} />
+          <View className='skeleton-card' style={{ height: '180rpx' }} />
+          <View className='skeleton-card' style={{ height: '180rpx' }} />
         </View>
+        {/* Recent bills skeleton */}
         <View className='skeleton-card' style={{ height: '400rpx' }} />
       </View>
     )
   }
 
+  // Not authenticated — show empty state with login
+  if (!isAuthenticated) {
+    return (
+      <View className='home-container'>
+        {/* Header */}
+        <View className='dashboard-header'>
+          <View className='header-left'>
+            <Text className='header-title'>仪表盘</Text>
+            <Text className='header-subtitle'>{month}月财务概览</Text>
+          </View>
+          <View className='header-right' />
+        </View>
+
+        {/* Empty state */}
+        <View className='empty-state-full'>
+          <Text className='empty-icon'>📋</Text>
+          <Text className='empty-text'>请先登录</Text>
+          <Text className='empty-hint'>登录后自动同步您的账单数据，查看本月财务概览</Text>
+          <Button className='empty-login-btn' onClick={handleLogin}>
+            立即登录
+          </Button>
+        </View>
+      </View>
+    )
+  }
+
+  const netGradient = summary && summary.net < 0 ? 'stat-card-expense' : 'stat-card-balance'
+
   return (
+    <View className='home-container'>
     <ScrollView
-      className='home-container'
       scrollY
       refresherEnabled
       refresherTriggered={refreshing}
       onRefresherRefresh={handleRefresh}
+      style={{ flex: 1 }}
     >
-      {/* 用户卡片 */}
-      <View className='user-card'>
-        <View className='user-avatar'>
-          <Text className='user-avatar-text'>💰</Text>
+      {/* Header */}
+      <View className='dashboard-header'>
+        <View className='header-left'>
+          <Text className='header-title'>仪表盘</Text>
+          <Text className='header-subtitle'>{month}月财务概览</Text>
         </View>
-        <View className='user-info'>
-          <Text className='greeting'>你好，{userName} 👋</Text>
-          <Text className='date'>{dateStr}</Text>
-        </View>
+        <View className='header-right' />
       </View>
 
-      {/* 统计卡片网格 */}
-      <View className='stats-grid'>
-        <View className='stat-card-mini income'>
-          <View className='stat-icon stat-icon-income'>
-            <Text>↓</Text>
+      {/* Stat Cards */}
+      {summary && (
+        <View className='stats-grid stagger-children'>
+          <View className='stat-card stat-card-income'>
+            <View className='stat-card-header'>
+              <Text className='stat-label'>收入</Text>
+              <View className='stat-icon-wrapper stat-icon-income'>
+                <Text className='stat-icon-text'>↑</Text>
+              </View>
+            </View>
+            <Text className='stat-value'>{summary.income.toFixed(2)}</Text>
+            <Text className='stat-unit'>元</Text>
           </View>
-          <Text className='stat-label'>本月收入</Text>
-          <Text className='stat-value-mini income'>
-            ¥{stats.totalIncome.toFixed(0)}
-          </Text>
-        </View>
-        <View className='stat-card-mini expense'>
-          <View className='stat-icon stat-icon-expense'>
-            <Text>↑</Text>
-          </View>
-          <Text className='stat-label'>本月支出</Text>
-          <Text className='stat-value-mini expense'>
-            ¥{stats.totalExpense.toFixed(0)}
-          </Text>
-        </View>
-        <View className='stat-card-mini balance'>
-          <View className='stat-icon stat-icon-balance'>
-            <Text>≡</Text>
-          </View>
-          <Text className='stat-label'>结余</Text>
-          <Text className={`stat-value-mini ${stats.balance >= 0 ? 'balance' : 'expense'}`}>
-            ¥{stats.balance.toFixed(0)}
-          </Text>
-        </View>
-      </View>
 
-      {/* 快速记账按钮 */}
-      <View className='quick-add-btn' onClick={handleQuickAdd}>
-        <Text className='quick-add-icon'>+</Text>
-        <Text className='quick-add-text'>记一笔</Text>
-      </View>
+          <View className='stat-card stat-card-expense'>
+            <View className='stat-card-header'>
+              <Text className='stat-label'>支出</Text>
+              <View className='stat-icon-wrapper stat-icon-expense'>
+                <Text className='stat-icon-text'>↓</Text>
+              </View>
+            </View>
+            <Text className='stat-value'>{Math.abs(summary.expense).toFixed(2)}</Text>
+            <Text className='stat-unit'>元</Text>
+          </View>
 
-      {/* 最近账单 */}
-      <View className='recent-bills'>
+          <View className={`stat-card ${netGradient}`}>
+            <View className='stat-card-header'>
+              <Text className='stat-label'>结余</Text>
+              <View className={`stat-icon-wrapper ${summary.net >= 0 ? 'stat-icon-balance' : 'stat-icon-expense'}`}>
+                <Text className='stat-icon-text'>=</Text>
+              </View>
+            </View>
+            <Text className='stat-value'>{summary.net.toFixed(2)}</Text>
+            <Text className='stat-unit'>元</Text>
+          </View>
+
+          <View className='stat-card stat-card-total'>
+            <View className='stat-card-header'>
+              <Text className='stat-label'>交易笔数</Text>
+              <View className='stat-icon-wrapper stat-icon-total'>
+                <Text className='stat-icon-text'>#</Text>
+              </View>
+            </View>
+            <Text className='stat-value'>{summary.transaction_count}</Text>
+            <Text className='stat-unit'>笔</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Category Breakdown */}
+      {categoryBreakdown.length > 0 && (
+        <View className='card-glass category-card'>
+          <View className='section-header'>
+            <Text className='section-title'>{month}月支出分类</Text>
+            <Text className='view-all' onClick={handleViewAll}>账单 →</Text>
+          </View>
+          <View className='category-list'>
+            {categoryBreakdown.slice(0, 6).map((item) => {
+              const pct = totalCategoryExpense > 0 ? (item.amount / totalCategoryExpense) * 100 : 0
+              return (
+                <View key={item.category} className='category-item'>
+                  <View className='category-item-top'>
+                    <Text className='category-name'>{item.category}</Text>
+                    <Text className='category-amount'>¥{item.amount.toFixed(0)}</Text>
+                  </View>
+                  <View className='category-progress-track'>
+                    <View
+                      className='category-progress-fill'
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
+                  </View>
+                  <Text className='category-pct'>{pct.toFixed(1)}%</Text>
+                </View>
+              )
+            })}
+          </View>
+        </View>
+      )}
+
+      {/* Recent Bills */}
+      <View className='card-glass bills-card'>
         <View className='section-header'>
           <Text className='section-title'>最近账单</Text>
-          <Text
-            className='view-all'
-            onClick={() => Taro.switchTab({ url: '/pages/bills/list' })}
-          >
-            查看全部 →
-          </Text>
+          <Text className='view-all' onClick={handleViewAll}>查看全部 →</Text>
         </View>
-
-        {recentBills.length > 0 ? (
+        {recentBills.length === 0 ? (
+          <View className='bills-empty'>
+            <Text className='bills-empty-icon'>📋</Text>
+            <Text className='bills-empty-text'>暂无账单</Text>
+          </View>
+        ) : (
           <View className='bill-list'>
             {recentBills.map((bill) => (
               <View
@@ -183,47 +262,36 @@ const HomePage: React.FC = () => {
                     <Text>📦</Text>
                   </View>
                   <View className='bill-info'>
-                    <Text className='bill-category'>
-                      {bill.category || '未分类'}
+                    <Text className='bill-payee'>
+                      {bill.payee || bill.description || '未命名'}
                     </Text>
-                    {bill.note && (
-                      <Text className='bill-note'>{bill.note}</Text>
-                    )}
+                    <View className='bill-meta'>
+                      <Text className='bill-category-badge'>{bill.category || '未分类'}</Text>
+                      <Text className='bill-date'>{bill.transaction_date?.slice(0, 10) || ''}</Text>
+                    </View>
                   </View>
                 </View>
-                <View className='bill-right'>
-                  <Text className={`bill-amount ${bill.direction === '收入' ? 'in' : 'out'}`}>
-                    {bill.direction === '收入' ? '+' : '-'}
-                    ¥{bill.amount.toFixed(2)}
-                  </Text>
-                  <Text className='bill-time'>
-                    {bill.created_at ? bill.created_at.slice(5, 16) : ''}
-                  </Text>
-                </View>
+                <Text className={`bill-amount ${bill.amount < 0 ? 'bill-amount-negative' : 'bill-amount-positive'}`}>
+                  {bill.amount < 0 ? '−' : '+'}{Math.abs(bill.amount).toFixed(2)}
+                </Text>
               </View>
             ))}
           </View>
-        ) : (
-          <View className='empty-state'>
-            <Text className='empty-icon'>📋</Text>
-            <Text className='empty-text'>
-              {isLoggedIn ? '暂无账单记录' : '请先登录'}
-            </Text>
-            <Text className='empty-hint'>
-              {isLoggedIn ? '点击上方"记一笔"开始记账' : '登录后自动同步您的账单数据'}
-            </Text>
-            {!isLoggedIn && (
-              <Button
-                className='empty-login-btn'
-                onClick={() => Taro.navigateTo({ url: '/pages/login/index' })}
-              >
-                立即登录
-              </Button>
-            )}
-          </View>
         )}
       </View>
+
+        {/* Bottom spacer for floating button */}
+      <View style={{ height: '200rpx' }} />
     </ScrollView>
+
+    {/* AI 记账入口 */}
+    {isAuthenticated && (
+      <View className='quick-add-fab' onClick={handleAIChat}>
+        <Text className='quick-add-fab-icon'>✨</Text>
+        <Text className='quick-add-fab-text'>AI记账</Text>
+      </View>
+    )}
+    </View>
   )
 }
 

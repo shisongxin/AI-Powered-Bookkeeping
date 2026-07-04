@@ -1,25 +1,36 @@
 import React, { useState, useCallback, useEffect } from 'react'
-import { View, Text, Textarea, Button, Input, Picker } from '@tarojs/components'
+import { View, Text, Textarea, Button, Input } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import AmountInput from '../../shared/components/AmountInput'
 import { validateAmount, validateDate } from '../../shared/utils/validation'
-import { createBill, getBillById, updateBill } from '../../shared/api/client'
+import { createBill, getBillById, updateBill, getCategories } from '../../shared/api/client'
+import { useDataStore } from '../../shared/stores/useDataStore'
 import './add.css'
 
-// 分类列表（与 Web 端对齐）
-const EXPENSE_CATEGORIES = [
-  '餐饮', '交通', '购物', '娱乐', '居住', '医疗', '教育',
-  '超市', '日用', '水果', '零食', '运动', '通讯', '服饰',
-  '彩妆', '住房', '居家', '孩子', '长辈', '社交', '旅行',
-  '烟酒', '数码', '汽车', '书籍', '学习', '宠物', '礼金',
-  '礼物', '办公', '维修', '捐赠', '彩票', '其他'
+// 默认分类（API 不可用时降级使用）
+const DEFAULT_EXPENSE_CATEGORIES: Array<{ name: string; icon: string }> = [
+  { name: '餐饮', icon: '🍜' }, { name: '交通', icon: '🚗' }, { name: '购物', icon: '🛒' },
+  { name: '娱乐', icon: '🎮' }, { name: '居住', icon: '🏠' }, { name: '医疗', icon: '💊' },
+  { name: '教育', icon: '📚' }, { name: '超市', icon: '🛒' }, { name: '日用', icon: '🧴' },
+  { name: '水果', icon: '🍎' }, { name: '零食', icon: '🍬' }, { name: '运动', icon: '⚽' },
+  { name: '通讯', icon: '📱' }, { name: '服饰', icon: '👗' }, { name: '彩妆', icon: '💄' },
+  { name: '住房', icon: '🏠' }, { name: '居家', icon: '🛋️' }, { name: '孩子', icon: '👶' },
+  { name: '长辈', icon: '👴' }, { name: '社交', icon: '👥' }, { name: '旅行', icon: '✈️' },
+  { name: '烟酒', icon: '🚬' }, { name: '数码', icon: '💻' }, { name: '汽车', icon: '🚗' },
+  { name: '书籍', icon: '📚' }, { name: '学习', icon: '📖' }, { name: '宠物', icon: '🐱' },
+  { name: '礼金', icon: '🧧' }, { name: '礼物', icon: '🎁' }, { name: '办公', icon: '💼' },
+  { name: '维修', icon: '🔧' }, { name: '捐赠', icon: '🎁' }, { name: '彩票', icon: '🎰' },
+  { name: '其他', icon: '📦' }
 ]
 
-const INCOME_CATEGORIES = [
-  '工资', '转账', '理财', '红包', '报销', '退款', '其他'
+const DEFAULT_INCOME_CATEGORIES: Array<{ name: string; icon: string }> = [
+  { name: '工资', icon: '💰' }, { name: '转账', icon: '🔄' }, { name: '理财', icon: '📈' },
+  { name: '红包', icon: '🧧' }, { name: '报销', icon: '💼' }, { name: '退款', icon: '↩️' },
+  { name: '其他', icon: '📦' }
 ]
 
 const AddBillPage: React.FC = () => {
+  const bumpBillsVersion = useDataStore((s) => s.bumpBillsVersion)
   const router = useRouter()
   const billId = router.params.id ? Number(router.params.id) : null
   const mode = router.params.mode || 'create' // 'create' or 'edit'
@@ -33,8 +44,37 @@ const AddBillPage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [apiCategories, setApiCategories] = useState<Array<{ name: string; icon: string }>>([])
 
-  const categories = direction === 'in' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES
+  // 从 API 获取分类列表
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const data = await getCategories()
+        if (cancelled) return
+        // 为分类添加 emoji 图标（API 返回的 icon 可能为空）
+        const mapped = data.map((c: any) => ({
+          name: c.name,
+          icon: c.icon || DEFAULT_EXPENSE_CATEGORIES.find(d => d.name === c.name)?.icon || '📁'
+        }))
+        setApiCategories(mapped)
+      } catch (e) {
+        console.error('加载分类失败:', e)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  // 优先使用 API 分类，降级到默认分类
+  const expenseCats: Array<{ name: string; icon: string }> = apiCategories.length > 0
+    ? apiCategories
+    : DEFAULT_EXPENSE_CATEGORIES
+  const incomeCats: Array<{ name: string; icon: string }> = apiCategories.length > 0
+    ? apiCategories.filter((c: { name: string }) => ['工资', '转账', '理财', '红包', '报销', '退款', '收入'].some(n => c.name.includes(n)))
+    : DEFAULT_INCOME_CATEGORIES
+  const categories = direction === 'in' ? incomeCats : expenseCats
 
   // 如果是编辑模式，加载账单数据
   useEffect(() => {
@@ -92,15 +132,15 @@ const AddBillPage: React.FC = () => {
 
       if (mode === 'edit' && billId) {
         await updateBill(billId, billData)
+        bumpBillsVersion()
         Taro.showToast({ title: '修改成功', icon: 'success', duration: 1500 })
       } else {
         await createBill(billData)
+        bumpBillsVersion()
         Taro.showToast({ title: '添加成功', icon: 'success', duration: 1500 })
       }
 
-      setTimeout(() => {
-        Taro.navigateBack()
-      }, 1500)
+      Taro.navigateBack()
     } catch (e: any) {
       Taro.showToast({
         title: e.message || (mode === 'edit' ? '修改失败，请重试' : '添加失败，请重试'),
@@ -173,20 +213,21 @@ const AddBillPage: React.FC = () => {
           {errors.amount && <Text className='error-text'>{errors.amount}</Text>}
         </View>
 
-        {/* 分类选择 */}
+        {/* 分类选择 — 仿 Web 端 emoji 网格 */}
         <View className='form-section'>
           <Text className='section-label'>分类</Text>
-          <Picker
-            mode='selector'
-            range={categories}
-            value={categories.indexOf(category)}
-            onChange={(e) => setCategory(categories[e.detail.value])}
-          >
-            <View className='category-picker'>
-              <Text>{category || '选择分类'}</Text>
-              <Text className='picker-arrow'>▼</Text>
-            </View>
-          </Picker>
+          <View className='category-grid'>
+            {categories.map((cat: { name: string; icon: string }) => (
+              <View
+                key={cat.name}
+                className={`category-grid-item ${category === cat.name ? 'active' : ''}`}
+                onClick={() => setCategory(cat.name)}
+              >
+                <Text className='category-grid-icon'>{cat.icon}</Text>
+                <Text className='category-grid-name'>{cat.name}</Text>
+              </View>
+            ))}
+          </View>
           {errors.category && <Text className='error-text'>{errors.category}</Text>}
         </View>
 

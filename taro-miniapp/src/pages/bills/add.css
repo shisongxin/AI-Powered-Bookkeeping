@@ -90,25 +90,48 @@
   background: #ffffff;
 }
 
-/* ===== 分类选择器 ===== */
-.category-picker {
+/* ===== 分类选择 — 仿 Web 端 emoji 网格 ===== */
+.category-grid {
   display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  max-height: 320rpx;
+  overflow-y: auto;
+  padding: 8rpx 0;
+}
+
+.category-grid-item {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 20rpx 24rpx;
+  justify-content: center;
+  width: 140rpx;
+  height: 120rpx;
   background: #faf7f5;
   border: 2rpx solid #e8e0d8;
   border-radius: 16rpx;
+  transition: all 0.2s ease;
 }
 
-.category-picker text {
-  font-size: 28rpx;
+.category-grid-item:active {
+  transform: scale(0.95);
+}
+
+.category-grid-item.active {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-color: #fbbf24;
+  box-shadow: 0 4rpx 12rpx rgba(251, 191, 36, 0.3);
+}
+
+.category-grid-icon {
+  font-size: 36rpx;
+  margin-bottom: 6rpx;
+}
+
+.category-grid-name {
+  font-size: 22rpx;
   color: #2d241c;
-}
-
-.picker-arrow {
-  font-size: 20rpx;
-  color: #a89580;
+  text-align: center;
 }
 
 /* ===== 备注文本框 ===== */

@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { View, Text, Button } from '@tarojs/components'
-import Taro, { useRouter } from '@tarojs/taro'
+import Taro, { useRouter, useDidShow } from '@tarojs/taro'
 import { getBillById, deleteBill } from '../../../shared/api/client'
+import { useDataStore } from '../../../shared/stores/useDataStore'
 import './detail.css'
 
 /**
@@ -11,6 +12,9 @@ import './detail.css'
 const BillDetailPage: React.FC = () => {
   const router = useRouter()
   const billId = Number(router.params.id)
+  const bumpBillsVersion = useDataStore((s) => s.bumpBillsVersion)
+  const billsVersion = useDataStore((s) => s.billsVersion)
+  const lastVersionRef = useRef(billsVersion)
 
   const [bill, setBill] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -40,6 +44,14 @@ const BillDetailPage: React.FC = () => {
     loadBill()
   }, [loadBill])
 
+  // 监听 billsVersion 变化（其他页面增删改后自动刷新详情）
+  useDidShow(() => {
+    if (billsVersion !== lastVersionRef.current) {
+      lastVersionRef.current = billsVersion
+      loadBill()
+    }
+  })
+
   // 编辑账单
   const handleEdit = useCallback(() => {
     Taro.navigateTo({
@@ -52,21 +64,22 @@ const BillDetailPage: React.FC = () => {
     Taro.showModal({
       title: '确认删除',
       content: '确定要删除这条账单吗？删除后不可恢复。',
-      success: async (res) => {
+      confirmColor: '#f59e0b',
+      success: (res) => {
         if (res.confirm) {
-          try {
-            await deleteBill(billId)
-            Taro.showToast({ title: '删除成功', icon: 'success', duration: 1500 })
-            setTimeout(() => {
+          deleteBill(billId)
+            .then(() => {
+              bumpBillsVersion()
+              Taro.showToast({ title: '删除成功', icon: 'success', duration: 1500 })
               Taro.navigateBack()
-            }, 1500)
-          } catch (err: any) {
-            Taro.showToast({
-              title: err?.message || '删除失败',
-              icon: 'none',
-              duration: 2000
             })
-          }
+            .catch((err: any) => {
+              Taro.showToast({
+                title: err?.message || '删除失败',
+                icon: 'none',
+                duration: 2000
+              })
+            })
         }
       }
     })
@@ -80,13 +93,7 @@ const BillDetailPage: React.FC = () => {
   // 格式化日期
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '-'
-    return dateStr.slice(0, 10)
-  }
-
-  // 格式化时间
-  const formatTime = (dateStr: string) => {
-    if (!dateStr) return '-'
-    return dateStr.slice(11, 16)
+    return dateStr.slice(5, 10)
   }
 
   // 加载状态
@@ -178,10 +185,6 @@ const BillDetailPage: React.FC = () => {
           <Text className='info-label'>日期</Text>
           <Text className='info-value'>{formatDate(bill.transaction_date || bill.created_at)}</Text>
         </View>
-        <View className='info-item'>
-          <Text className='info-label'>时间</Text>
-          <Text className='info-value'>{formatTime(bill.transaction_date || bill.created_at)}</Text>
-        </View>
         {bill.payee && (
           <View className='info-item'>
             <Text className='info-label'>交易对方</Text>
@@ -212,10 +215,6 @@ const BillDetailPage: React.FC = () => {
             <Text className='info-value'>{bill.remark}</Text>
           </View>
         )}
-        <View className='info-item'>
-          <Text className='info-label'>创建时间</Text>
-          <Text className='info-value'>{bill.created_at ? new Date(bill.created_at).toLocaleString('zh-CN') : '-'}</Text>
-        </View>
       </View>
 
       {/* 操作按钮 */}

@@ -1,80 +1,76 @@
+/**
+ * 登录页面 — 统一账号体系
+ * 支持：
+ * 1. 微信一键登录（小程序环境）
+ * 2. 用户名密码登录（与网页端共享同一用户表）
+ * 3. 注册入口（跳转到注册页面）
+ *
+ * 登录成功后调用 /auth/me 获取完整用户信息，
+ * 保证两端用户数据一致
+ */
 import React, { useState, useCallback } from 'react'
 import { View, Text, Input, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useAuth } from '../../shared/hooks/useAuth'
-import { login as apiLogin, wechatLogin } from '../../shared/api/client'
+import { login as apiLogin, wechatLogin, getCurrentUser } from '../../shared/api/client'
 import './login.css'
 
-/**
- * 登录页面
- * 支持微信小程序微信一键登录和账号密码登录
- */
 const LoginPage: React.FC = () => {
-  // 检测运行环境
   const isMiniApp = Taro.getEnv() === 'WEAPP'
 
-  // 登录模式：默认密码登录（开发者工具模拟器无法调用微信登录）
+  // 默认密码登录（开发者工具模拟器无法调用微信登录）
   const [mode, setMode] = useState(isMiniApp ? 'wechat' : 'password')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const { isLoading, error, clearError, login: authLogin } = useAuth()
 
-  // 微信小程序微信一键登录
+  /** 登录成功后统一处理：获取用户信息 + 存储 token */
+  const handleLoginSuccess = useCallback(async (accessToken: string, fallbackNickname: string) => {
+    Taro.setStorageSync('token', accessToken)
+
+    // 调用 /auth/me 获取完整用户信息，保证与网页端一致
+    try {
+      const userInfo = await getCurrentUser()
+      const user = {
+        id: userInfo.id,
+        username: userInfo.username,
+        email: userInfo.email,
+        openid: userInfo.openid,
+        nickname: userInfo.username || fallbackNickname,
+        is_active: userInfo.is_active,
+        created_at: userInfo.created_at
+      }
+      await authLogin({ token: accessToken, user })
+    } catch {
+      // /auth/me 失败时使用 fallback
+      await authLogin({
+        token: accessToken,
+        user: { id: 0, nickname: fallbackNickname, username: username || '' }
+      })
+    }
+
+    Taro.showToast({ title: '登录成功', icon: 'success', duration: 1500 })
+    Taro.switchTab({ url: '/pages/analysis/index' })
+  }, [authLogin, username])
+
+  /** 微信一键登录 */
   const handleWeChatLogin = useCallback(async () => {
     clearError()
     try {
-      // 1. 调用 wx.login 获取 code
       const loginResult = await Taro.login()
       if (!loginResult.code) {
         throw new Error('获取登录凭证失败，请重试')
       }
-
-      console.log('微信登录 code:', loginResult.code)
-
-      // 2. 调用后端微信登录接口（用 code 换取 openid）
       const res = await wechatLogin(loginResult.code)
-
-      // 3. 存储 token 和用户信息
-      Taro.setStorageSync('token', res.access_token)
-
-      // 4. 更新认证状态
-      authLogin({
-        token: res.access_token,
-        refreshToken: '',
-        user: {
-          id: 0,
-          openid: '',
-          nickname: res.is_new_user ? '新用户' : '微信用户',
-          avatar_url: '',
-          phone: ''
-        }
-      })
-
-      // 5. 登录成功后跳转
-      Taro.showToast({
-        title: res.is_new_user ? '注册成功' : '登录成功',
-        icon: 'success',
-        duration: 1500
-      })
-
-      setTimeout(() => {
-        Taro.switchTab({ url: '/pages/index/index' })
-      }, 1500)
+      await handleLoginSuccess(res.access_token, res.is_new_user ? '新用户' : '微信用户')
     } catch (e: any) {
-      console.error('WeChat login error:', e)
-      Taro.showToast({
-        title: e.message || '微信登录失败，请稍后重试',
-        icon: 'none',
-        duration: 2000
-      })
+      Taro.showToast({ title: e.message || '微信登录失败', icon: 'none', duration: 2000 })
     }
-  }, [clearError, authLogin])
+  }, [clearError, handleLoginSuccess])
 
-  // 账号密码登录
+  /** 用户名密码登录 — 与网页端共用同一接口 */
   const handlePasswordLogin = useCallback(async () => {
     clearError()
-
-    // 表单验证
     if (!username.trim()) {
       Taro.showToast({ title: '请输入用户名', icon: 'none', duration: 2000 })
       return
@@ -83,50 +79,25 @@ const LoginPage: React.FC = () => {
       Taro.showToast({ title: '请输入密码', icon: 'none', duration: 2000 })
       return
     }
-
     try {
-      // 调用后端登录 API
       const res = await apiLogin(username, password)
-
-      // 存储 token
-      Taro.setStorageSync('token', res.access_token)
-
-      // 更新认证状态
-      authLogin({
-        token: res.access_token,
-        refreshToken: '',
-        user: {
-          id: 0,
-          nickname: username,
-          avatar_url: '',
-          phone: ''
-        }
-      })
-
-      // 登录成功后跳转
-      Taro.showToast({ title: '登录成功', icon: 'success', duration: 1500 })
-
-      setTimeout(() => {
-        Taro.switchTab({ url: '/pages/index/index' })
-      }, 1500)
+      await handleLoginSuccess(res.access_token, username)
     } catch (e: any) {
-      console.error('Password login error:', e)
-      Taro.showToast({
-        title: e.message || '用户名或密码错误',
-        icon: 'none',
-        duration: 2000
-      })
+      Taro.showToast({ title: e.message || '用户名或密码错误', icon: 'none', duration: 2000 })
     }
-  }, [username, password, clearError, authLogin])
+  }, [username, password, clearError, handleLoginSuccess])
+
+  /** 跳转到注册页面 */
+  const handleGoRegister = useCallback(() => {
+    Taro.navigateTo({ url: '/pages/register/index' })
+  }, [])
 
   return (
     <View className='login-container'>
       <View className='login-card'>
         {/* Logo 区域 */}
         <View className='logo-section'>
-          <View className='logo-icon'>
-            <Text>💰</Text>
-          </View>
+          <View className='logo-icon'><Text>💰</Text></View>
           <Text className='logo-title'>AI记账</Text>
           <Text className='logo-subtitle'>智能财务管理助手</Text>
         </View>
@@ -138,82 +109,50 @@ const LoginPage: React.FC = () => {
           </View>
         )}
 
-        {/* 微信登录表单（小程序环境默认显示） */}
+        {/* 微信登录 */}
         {mode === 'wechat' && (
           <View className='login-form'>
             <View className='wechat-desc'>
-              <Text className='wechat-desc-text'>
-                使用微信授权一键登录，无需注册
-              </Text>
+              <Text className='wechat-desc-text'>使用微信授权一键登录，无需注册</Text>
             </View>
-            <Button
-              className='wechat-login-btn'
-              onClick={handleWeChatLogin}
-              loading={isLoading}
-              disabled={isLoading}
-            >
+            <Button className='wechat-login-btn' onClick={handleWeChatLogin} loading={isLoading} disabled={isLoading}>
               🔐 微信一键登录
             </Button>
             <View className='mode-switch'>
-              <Text
-                className='switch-link'
-                onClick={() => setMode('password')}
-              >
-                使用密码登录 →
-              </Text>
+              <Text className='switch-link' onClick={() => setMode('password')}>使用密码登录 →</Text>
             </View>
           </View>
         )}
 
-        {/* 密码登录表单 */}
+        {/* 密码登录 */}
         {mode === 'password' && (
           <View className='login-form'>
-            <View className='demo-hint'>
-              <Text className='demo-hint-text'>演示账号: admin / 123456</Text>
-            </View>
             <View className='input-group'>
               <Text className='input-label'>用户名</Text>
-              <Input
-                className='input-field'
-                type='text'
-                value={username}
-                onInput={(e) => setUsername(e.detail.value)}
-                placeholder='请输入用户名'
-                maxlength={20}
-              />
+              <Input className='input-field' type='text' value={username}
+                onInput={(e) => setUsername(e.detail.value)} placeholder='请输入用户名' maxlength={20} />
             </View>
             <View className='input-group'>
               <Text className='input-label'>密码</Text>
-              <Input
-                className='input-field'
-                type='safe-password'
-                value={password}
-                onInput={(e) => setPassword(e.detail.value)}
-                placeholder='请输入密码'
-                maxlength={32}
-                password
-              />
+              <Input className='input-field' type='safe-password' value={password}
+                onInput={(e) => setPassword(e.detail.value)} placeholder='请输入密码' maxlength={32} password />
             </View>
-            <Button
-              className='password-login-btn'
-              onClick={handlePasswordLogin}
-              loading={isLoading}
-              disabled={isLoading}
-            >
+            <Button className='password-login-btn' onClick={handlePasswordLogin} loading={isLoading} disabled={isLoading}>
               {isLoading ? '登录中...' : '登 录'}
             </Button>
             {isMiniApp && (
               <View className='mode-switch'>
-                <Text
-                  className='switch-link'
-                  onClick={() => setMode('wechat')}
-                >
-                  ← 返回微信登录
-                </Text>
+                <Text className='switch-link' onClick={() => setMode('wechat')}>← 返回微信登录</Text>
               </View>
             )}
           </View>
         )}
+
+        {/* 注册入口 — 与网页端对齐 */}
+        <View className='register-entry'>
+          <Text className='register-text'>还没有账号？</Text>
+          <Text className='register-link' onClick={handleGoRegister}>立即注册</Text>
+        </View>
 
         {/* 底部协议 */}
         <View className='login-footer'>

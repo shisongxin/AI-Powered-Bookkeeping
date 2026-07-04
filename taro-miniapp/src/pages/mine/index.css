@@ -1,8 +1,13 @@
-/* 我的页面样式 — 仿 Web 端深色+金色风格 */
+/* ============================================================
+   我的页面 (Mine) — 仿 Web 端深色 + 金色奢华风格
+   warm gold + espresso luxury aesthetic
+   ============================================================ */
+
 .mine-container {
   min-height: 100vh;
   background: #faf7f5;
-  padding-bottom: 40rpx;
+  padding: 24rpx 24rpx 40rpx;
+  box-sizing: border-box;
 }
 
 /* ===== 用户信息卡片 ===== */
@@ -13,7 +18,9 @@
   background: linear-gradient(135deg, #2d241c 0%, #1c1917 100%);
   border-radius: 24rpx;
   margin-bottom: 24rpx;
-  box-shadow: 0 8rpx 32rpx rgba(45, 36, 28, 0.2);
+  box-shadow: 0 8rpx 32rpx rgba(45, 36, 28, 0.25);
+  border: 1rpx solid rgba(251, 191, 36, 0.15);
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .user-avatar {
@@ -25,7 +32,8 @@
   justify-content: center;
   align-items: center;
   margin-right: 28rpx;
-  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.4);
+  box-shadow: 0 4rpx 20rpx rgba(245, 158, 11, 0.45);
+  border: 3rpx solid rgba(251, 191, 36, 0.4);
 }
 
 .user-avatar-text {
@@ -49,17 +57,18 @@
 .user-id {
   display: block;
   font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.55);
 }
 
-/* ===== 统计摘要 ===== */
+/* ===== 月度统计摘要 ===== */
 .stats-summary {
   display: flex;
   background: #ffffff;
   border-radius: 20rpx;
-  padding: 32rpx;
+  padding: 32rpx 20rpx;
   margin-bottom: 24rpx;
   box-shadow: 0 2rpx 12rpx rgba(45, 36, 28, 0.06);
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
 }
 
 .stat-item {
@@ -86,9 +95,20 @@
   width: 1rpx;
   height: 60rpx;
   background: #f0ebe5;
+  align-self: center;
 }
 
-/* ===== 菜单列表 ===== */
+/* 收入 — 绿色 */
+.color-income {
+  color: #10b981;
+}
+
+/* 支出 — 红色 */
+.color-expense {
+  color: #ef4444;
+}
+
+/* ===== 菜单区域 ===== */
 .menu-section {
   background: #ffffff;
   border-radius: 20rpx;
@@ -113,6 +133,7 @@
   background: #faf7f5;
 }
 
+/* 菜单图标背景 */
 .menu-icon {
   width: 64rpx;
   height: 64rpx;
@@ -128,10 +149,38 @@
   font-size: 32rpx;
 }
 
+/* 图标配色 */
+.bg-income-light {
+  background: #ecfdf5;
+}
+
+.bg-expense-light {
+  background: #fef2f2;
+}
+
+.bg-balance-light {
+  background: #eff6ff;
+}
+
+.bg-gold-light {
+  background: #fef3c7;
+}
+
+/* AI 聊天入口 — 渐变高亮 */
+.bg-chat-gradient {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 4rpx 16rpx rgba(245, 158, 11, 0.3);
+}
+
 .menu-title {
   flex: 1;
   font-size: 28rpx;
   color: #2d241c;
+}
+
+.menu-title-bold {
+  font-weight: 600;
+  color: #92400e;
 }
 
 .menu-arrow {
@@ -139,6 +188,7 @@
   color: #c4b5a5;
 }
 
+/* New 徽章 */
 .menu-badge {
   background: #ef4444;
   color: #ffffff;
@@ -146,6 +196,7 @@
   padding: 4rpx 12rpx;
   border-radius: 20rpx;
   margin-right: 16rpx;
+  line-height: 1.4;
 }
 
 /* ===== 退出登录 ===== */
@@ -160,6 +211,11 @@
   color: #ef4444;
   border: none;
   box-shadow: 0 2rpx 12rpx rgba(45, 36, 28, 0.06);
+  margin-bottom: 24rpx;
+}
+
+.logout-btn::after {
+  border: none;
 }
 
 .logout-btn:active {
@@ -203,7 +259,7 @@
 /* ===== 版本信息 ===== */
 .version-info {
   text-align: center;
-  padding: 40rpx;
+  padding: 40rpx 0 20rpx;
 }
 
 .version-text {
