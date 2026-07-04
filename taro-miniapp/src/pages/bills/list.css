@@ -570,30 +570,23 @@
   overflow: hidden;
 }
 
-/* Date cell */
+/* Date cell — 单行月-日 */
 .date-cell {
   width: 90rpx;
-  padding-right: 12rpx;
+  padding-right: 16rpx;
 }
 
 .bill-date-main {
-  font-size: 24rpx;
+  font-size: 26rpx;
   color: #2d241c;
-  font-weight: 500;
+  font-weight: 600;
   display: block;
-}
-
-.bill-date-full {
-  font-size: 18rpx;
-  color: #a89580;
-  display: block;
-  margin-top: 2rpx;
 }
 
 /* Category cell */
 .category-cell {
-  width: 90rpx;
-  padding-right: 12rpx;
+  width: 100rpx;
+  padding-right: 16rpx;
 }
 
 .bill-category-tag {
@@ -604,21 +597,6 @@
   border-radius: 10rpx;
   display: inline-block;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Payee cell */
-.payee-cell {
-  width: 120rpx;
-  padding-right: 12rpx;
-}
-
-.bill-payee-text {
-  font-size: 24rpx;
-  color: #2d241c;
-  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -518,8 +518,8 @@ const BillsListPage: React.FC = () => {
                     // 使用与后端一致的逻辑：direction === "收入" 为收入
                     const isIncome = bill.direction === '收入' || (!bill.direction && bill.amount > 0)
                     const amountColor = isIncome ? 'income' : 'expense'
+                    // 只显示月-日，年月已在月份组头部展示
                     const displayDate = (bill.transaction_date || bill.created_at || '').slice(5, 10)
-                    const displayDateFull = (bill.transaction_date || bill.created_at || '').slice(0, 10)
 
                     return (
                       <View
@@ -529,20 +529,16 @@ const BillsListPage: React.FC = () => {
                       >
                         <View className='bill-cell date-cell'>
                           <Text className='bill-date-main'>{displayDate}</Text>
-                          <Text className='bill-date-full'>{displayDateFull}</Text>
                         </View>
                         <View className='bill-cell category-cell'>
                           <Text className='bill-category-tag'>{bill.category || '其他'}</Text>
-                        </View>
-                        <View className='bill-cell payee-cell'>
-                          <Text className='bill-payee-text' numberOfLines={1}>{bill.payee || '-'}</Text>
                         </View>
                         <View className='bill-cell desc-cell'>
                           <Text className='bill-desc-text' numberOfLines={1}>{bill.description || bill.note || '-'}</Text>
                         </View>
                         <View className={`bill-cell amount-cell ${amountColor}`}>
                           <Text className='bill-amount-text'>
-                            {isIncome ? '+' : '-'}¥{Math.abs(bill.amount).toFixed(2)}
+                            {isIncome ? '+' : '-'}{Math.abs(bill.amount).toFixed(2)}
                           </Text>
                         </View>
                       </View>
