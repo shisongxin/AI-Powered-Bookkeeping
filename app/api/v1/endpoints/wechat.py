@@ -94,8 +94,8 @@ def wechat_login_with_code(data: WechatMiniProgramLoginRequest, db: Session = De
 
     if not appid or not secret:
         raise HTTPException(
-            status_code=500,
-            detail="微信配置未设置，请配置 WECHAT_APPID 和 WECHAT_SECRET"
+            status_code=503,
+            detail="微信配置未设置，请在 .env 中配置 WECHAT_APPID 和 WECHAT_SECRET"
         )
 
     if not data.code:
