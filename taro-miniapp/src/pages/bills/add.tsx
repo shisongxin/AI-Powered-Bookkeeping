@@ -1,13 +1,12 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { View, Text, Textarea, Button, Input, Picker } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
-import AmountInput from '../../shared/components/AmountInput'
 import { validateAmount, validateDate } from '../../shared/utils/validation'
 import { createBill, getBillById, updateBill, getCategories } from '../../shared/api/client'
 import { useDataStore } from '../../shared/stores/useDataStore'
 import './add.css'
 
-// 默认分类（API 不可用时降级使用）
+/** 默认分类（API 不可用时降级使用） */
 const DEFAULT_EXPENSE_CATEGORIES: Array<{ name: string; icon: string }> = [
   { name: '餐饮', icon: '🍜' }, { name: '交通', icon: '🚗' }, { name: '购物', icon: '🛒' },
   { name: '娱乐', icon: '🎮' }, { name: '居住', icon: '🏠' }, { name: '医疗', icon: '💊' },
@@ -33,7 +32,7 @@ const AddBillPage: React.FC = () => {
   const bumpBillsVersion = useDataStore((s) => s.bumpBillsVersion)
   const router = useRouter()
   const billId = router.params.id ? Number(router.params.id) : null
-  const mode = router.params.mode || 'create' // 'create' or 'edit'
+  const mode = router.params.mode || 'create'
 
   const [amount, setAmount] = useState(0)
   const [category, setCategory] = useState('')
@@ -53,7 +52,6 @@ const AddBillPage: React.FC = () => {
       try {
         const data = await getCategories()
         if (cancelled) return
-        // 为分类添加 emoji 图标（API 返回的 icon 可能为空）
         const mapped = data.map((c: any) => ({
           name: c.name,
           icon: c.icon || DEFAULT_EXPENSE_CATEGORIES.find(d => d.name === c.name)?.icon || '📁'
@@ -67,38 +65,49 @@ const AddBillPage: React.FC = () => {
     return () => { cancelled = true }
   }, [])
 
-  // 优先使用 API 分类，降级到默认分类
-  const expenseCats: Array<{ name: string; icon: string }> = apiCategories.length > 0
+  const expenseCats = apiCategories.length > 0
     ? apiCategories
     : DEFAULT_EXPENSE_CATEGORIES
-  const incomeCats: Array<{ name: string; icon: string }> = apiCategories.length > 0
-    ? apiCategories.filter((c: { name: string }) => ['工资', '转账', '理财', '红包', '报销', '退款', '收入'].some(n => c.name.includes(n)))
+  const incomeCats = apiCategories.length > 0
+    ? apiCategories.filter((c: { name: string }) =>
+        ['工资', '转账', '理财', '红包', '报销', '退款', '收入'].some(n => c.name.includes(n)))
     : DEFAULT_INCOME_CATEGORIES
   const categories = direction === 'in' ? incomeCats : expenseCats
 
-  // 如果是编辑模式，加载账单数据
+  // 加载账单（编辑模式）
   useEffect(() => {
     if (mode === 'edit' && billId) {
       setIsLoading(true)
       getBillById(billId)
         .then(bill => {
-          setAmount(bill.amount)
+          const rawAmount = bill.amount != null && bill.amount !== ''
+            ? (typeof bill.amount === 'string' ? parseFloat(bill.amount) : Number(bill.amount))
+            : 0
+          const loadedAmount = Math.abs(rawAmount)
+          if (!isNaN(loadedAmount)) {
+            setAmount(loadedAmount)
+          }
           setDirection(bill.direction === '收入' ? 'in' : 'out')
-          setDate(bill.transaction_date ? bill.transaction_date.slice(0, 10) : new Date().toISOString().split('T')[0])
+          setDate(bill.transaction_date
+            ? String(bill.transaction_date).slice(0, 10)
+            : new Date().toISOString().split('T')[0])
           setDescription(bill.description || bill.note || '')
           setPayee(bill.payee || '')
           setCategory(bill.category || '')
         })
         .catch(err => {
-          Taro.showToast({
-            title: err?.message || '加载账单失败',
-            icon: 'none',
-            duration: 2000
-          })
+          Taro.showToast({ title: err?.message || '加载账单失败', icon: 'none', duration: 2000 })
         })
-        .finally(() => setIsLoading(false))
+        .finally(() => {
+          setIsLoading(false)
+        })
     }
   }, [mode, billId])
+
+  // 切换收支类型 — 不重置已选分类（后端允许任意分类 + 任意收支）
+  const handleDirectionChange = useCallback((dir: string) => {
+    setDirection(dir)
+  }, [])
 
   const validateForm = useCallback(() => {
     const newErrors: Record<string, string> = {}
@@ -121,8 +130,10 @@ const AddBillPage: React.FC = () => {
     if (!validateForm()) return
     setIsSubmitting(true)
     try {
+      // 支出时金额存为负数（与后端数据格式一致）
+      const signedAmount = direction === 'in' ? Math.abs(amount) : -Math.abs(amount)
       const billData = {
-        amount,
+        amount: signedAmount,
         category: category || '未分类',
         payee: payee || undefined,
         description: description || undefined,
@@ -156,18 +167,24 @@ const AddBillPage: React.FC = () => {
     Taro.navigateBack()
   }, [])
 
+  /** 格式化金额用于 Input value（编辑模式回填） */
+  const amountInputValue = amount > 0 ? String(amount) : ''
+
+  // 编辑模式加载状态
   if (isLoading) {
     return (
       <View className='add-bill-container'>
-        <View className='nav-header'>
-          <View className='nav-back' onClick={handleBack}>
-            <Text className='back-icon'>←</Text>
+        <View className='add-header'>
+          <View className='header-title-row'>
+            <View className='header-back' onClick={handleBack}>
+              <Text className='back-icon'>‹</Text>
+            </View>
+            <Text className='header-title'>编辑账单</Text>
+            <View style={{ width: '60rpx' }} />
           </View>
-          <Text className='nav-title'>编辑账单</Text>
-          <View className='nav-placeholder' />
         </View>
-        <View style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-          <Text>加载中...</Text>
+        <View className='loading-container'>
+          <Text className='loading-text'>加载中...</Text>
         </View>
       </View>
     )
@@ -175,47 +192,41 @@ const AddBillPage: React.FC = () => {
 
   return (
     <View className='add-bill-container'>
-      {/* 导航栏 */}
-      <View className='nav-header'>
-        <View className='nav-back' onClick={handleBack}>
-          <Text className='back-icon'>←</Text>
+      {/* ===== 深色头部区域 ===== */}
+      <View className='add-header'>
+        <View className='header-title-row'>
+          <View className='header-back' onClick={handleBack}>
+            <Text className='back-icon'>‹</Text>
+          </View>
+          <Text className='header-title'>{mode === 'edit' ? '编辑账单' : '记一笔'}</Text>
+          <View style={{ width: '60rpx' }} />
         </View>
-        <Text className='nav-title'>{mode === 'edit' ? '编辑账单' : '记一笔'}</Text>
-        <View className='nav-placeholder' />
+
+        {/* 收支类型切换 */}
+        <View className='direction-tabs'>
+          <View
+            className={`tab ${direction === 'out' ? 'active expense' : ''}`}
+            onClick={() => handleDirectionChange('out')}
+          >
+            <Text className='tab-text'>支出</Text>
+          </View>
+          <View
+            className={`tab ${direction === 'in' ? 'active income' : ''}`}
+            onClick={() => handleDirectionChange('in')}
+          >
+            <Text className='tab-text'>收入</Text>
+          </View>
+        </View>
       </View>
 
-      {/* 收支类型切换 */}
-      <View className='direction-tabs'>
-        <View
-          className={`tab ${direction === 'out' ? 'active expense' : ''}`}
-          onClick={() => setDirection('out')}
-        >
-          <Text className='tab-text'>支出</Text>
-        </View>
-        <View
-          className={`tab ${direction === 'in' ? 'active income' : ''}`}
-          onClick={() => setDirection('in')}
-        >
-          <Text className='tab-text'>收入</Text>
-        </View>
-      </View>
-
-      {/* 表单区域 - 仿 Web 端玻璃卡片 */}
+      {/* ===== 白色表单卡片（浮动覆盖头部底部） ===== */}
       <View className='form-card'>
-        {/* 金额 */}
-        <View className='form-section'>
-          <Text className='section-label'>金额</Text>
-          <AmountInput
-            value={amount}
-            onChange={setAmount}
-            placeholder='请输入金额'
-          />
-          {errors.amount && <Text className='error-text'>{errors.amount}</Text>}
-        </View>
-
-        {/* 分类选择 — 仿 Web 端 emoji 网格 */}
-        <View className='form-section'>
-          <Text className='section-label'>分类</Text>
+        {/* 分类选择 */}
+        <View className='category-section'>
+          <Text className='section-label'>
+            <Text className='section-label-icon'>{category ? '✅' : '📂'}</Text>
+            选择分类
+          </Text>
           <View className='category-grid'>
             {categories.map((cat: { name: string; icon: string }) => (
               <View
@@ -231,54 +242,80 @@ const AddBillPage: React.FC = () => {
           {errors.category && <Text className='error-text'>{errors.category}</Text>}
         </View>
 
+        {/* 金额输入 */}
+        <View className='form-row'>
+          <Text className='form-row-icon'>💰</Text>
+          <View className='form-row-content'>
+            <Text className='form-row-label'>金额</Text>
+            <Input
+              className='form-input'
+              type='text'
+              value={amountInputValue}
+              onInput={(e) => {
+                const val = parseFloat(e.detail.value)
+                setAmount(isNaN(val) ? 0 : val)
+              }}
+              placeholder='0.00'
+              maxlength={10}
+            />
+          </View>
+          <Text style={{ fontSize: '24rpx', color: '#a89580' }}>元</Text>
+        </View>
+        {errors.amount && <Text className='error-text'>{errors.amount}</Text>}
+
         {/* 商户 */}
-        <View className='form-section'>
-          <Text className='section-label'>商户</Text>
-          <Input
-            className='text-input'
-            type='text'
-            value={payee}
-            onInput={(e) => setPayee(e.detail.value)}
-            placeholder='商户名（可选）'
-            maxlength={50}
-          />
+        <View className='form-row'>
+          <Text className='form-row-icon'>🏪</Text>
+          <View className='form-row-content'>
+            <Text className='form-row-label'>商户</Text>
+            <Input
+              className='form-input'
+              type='text'
+              value={payee}
+              onInput={(e) => setPayee(e.detail.value)}
+              placeholder='商家名称（选填）'
+              maxlength={50}
+            />
+          </View>
         </View>
 
-        {/* 日期 — 下拉选择器 */}
-        <View className='form-section'>
-          <Text className='section-label'>日期</Text>
+        {/* 日期 */}
+        <View className='form-row'>
+          <Text className='form-row-icon'>📅</Text>
           <Picker
             mode='date'
             value={date}
             onChange={(e) => setDate(e.detail.value)}
           >
-            <View className='picker-trigger'>
-              <Text className={date ? 'picker-value' : 'picker-placeholder'}>
-                {date || '选择日期'}
-              </Text>
-              <Text className='picker-arrow'>▼</Text>
+            <View style={{ flex: 1 }}>
+              <Text className='form-row-value'>{date}</Text>
             </View>
           </Picker>
-          {errors.date && <Text className='error-text'>{errors.date}</Text>}
+          <Text className='form-row-arrow'>›</Text>
         </View>
+        {errors.date && <Text className='error-text'>{errors.date}</Text>}
 
-        {/* 描述 */}
-        <View className='form-section'>
-          <Text className='section-label'>描述</Text>
-          <Textarea
-            className='note-textarea'
-            value={description}
-            onInput={(e) => setDescription(e.detail.value)}
-            placeholder='描述（可选）'
-            maxlength={200}
-          />
+        {/* 备注 — 自动高度 */}
+        <View className='form-row form-row-textarea'>
+          <Text className='form-row-icon form-row-icon-top'>📝</Text>
+          <View className='form-row-content'>
+            <Text className='form-row-label'>备注</Text>
+            <Textarea
+              className='form-textarea'
+              value={description}
+              onInput={(e) => setDescription(e.detail.value)}
+              placeholder='添加备注（选填）'
+              maxlength={200}
+              auto-height
+            />
+          </View>
         </View>
       </View>
 
-      {/* 提交按钮 */}
+      {/* ===== 提交按钮 ===== */}
       <View className='submit-section'>
         <Button
-          className='submit-btn'
+          className={`submit-btn ${direction === 'out' ? 'expense' : 'income'}`}
           onClick={handleSubmit}
           loading={isSubmitting}
           disabled={isSubmitting}
@@ -286,13 +323,10 @@ const AddBillPage: React.FC = () => {
           {isSubmitting
             ? '保存中...'
             : mode === 'edit'
-              ? '修改'
-              : '保存'}
+              ? '保存修改'
+              : '完成记账'}
         </Button>
-        <Button
-          className='cancel-btn'
-          onClick={handleBack}
-        >
+        <Button className='cancel-btn' onClick={handleBack}>
           取消
         </Button>
       </View>

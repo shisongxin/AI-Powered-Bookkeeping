@@ -1,139 +1,141 @@
-/* 添加/编辑账单页面样式 — 仿 Web 端深色+金色风格 */
+/* 添加/编辑账单页面样式 — Warm Ledger 设计系统 */
+
 .add-bill-container {
   min-height: 100vh;
   background: #faf7f5;
-  padding-bottom: 40rpx;
+  padding-bottom: calc(40rpx + env(safe-area-inset-bottom));
 }
 
-/* ===== 收支类型切换 ===== */
+/* ===== 头部深色区域 ===== */
+.add-header {
+  background: linear-gradient(135deg, #2d241c 0%, #1c1917 100%);
+  padding: 28rpx 30rpx 40rpx;
+  position: relative;
+  overflow: hidden;
+}
+
+.add-header::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 300rpx;
+  height: 300rpx;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.12), transparent 70%);
+  pointer-events: none;
+}
+
+.header-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+}
+
+.header-title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.header-back {
+  width: 60rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -12rpx;
+}
+
+.header-back:active {
+  opacity: 0.6;
+}
+
+.back-icon {
+  font-size: 36rpx;
+  color: #ffffff;
+}
+
+/* ===== 收支类型切换 — 深色区域内 ===== */
 .direction-tabs {
   display: flex;
-  margin: 24rpx 30rpx;
-  background: #ffffff;
+  gap: 8rpx;
+  padding: 6rpx;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 20rpx;
-  overflow: hidden;
-  box-shadow: 0 2rpx 12rpx rgba(45, 36, 28, 0.06);
+  margin-top: 8rpx;
 }
 
 .tab {
   flex: 1;
-  padding: 28rpx;
+  padding: 18rpx;
   text-align: center;
-  background: #faf7f5;
-  transition: all 0.2s ease;
-}
-
-.tab:active {
-  opacity: 0.8;
-}
-
-.tab.active {
-  font-weight: 600;
-}
-
-.tab.active.expense {
-  background: linear-gradient(135deg, #fef2f2 0%, #fecaca 100%);
-  color: #ef4444;
-}
-
-.tab.active.income {
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-  color: #10b981;
+  border-radius: 16rpx;
+  transition: all 0.25s ease;
 }
 
 .tab-text {
-  font-size: 30rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
 }
 
-/* ===== 表单卡片（仿 Web 端玻璃卡片） ===== */
+.tab.active {
+  background: #ffffff;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.15);
+}
+
+.tab.active .tab-text {
+  font-weight: 600;
+}
+
+.tab.active.expense .tab-text {
+  color: #ef4444;
+}
+
+.tab.active.income .tab-text {
+  color: #10b981;
+}
+
+/* ===== 表单卡片 ===== */
 .form-card {
-  margin: 24rpx 30rpx;
-  padding: 32rpx;
+  margin: -20rpx 24rpx 24rpx;
+  padding: 0;
   background: #ffffff;
   border-radius: 24rpx;
-  box-shadow: 0 2rpx 12rpx rgba(45, 36, 28, 0.06);
+  box-shadow: 0 4rpx 24rpx rgba(45, 36, 28, 0.06);
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
 }
 
-/* ===== 表单区域 ===== */
-.form-section {
-  margin-bottom: 24rpx;
-}
-
-.form-section:last-child {
-  margin-bottom: 0;
+/* ===== 分类选择 — 网格 ===== */
+.category-section {
+  padding: 28rpx 24rpx;
+  border-bottom: 1rpx solid #f0ebe5;
 }
 
 .section-label {
-  display: block;
-  font-size: 26rpx;
-  font-weight: 500;
-  color: #8b7355;
-  margin-bottom: 12rpx;
-}
-
-/* ===== 文本输入框 ===== */
-.text-input {
-  width: 100%;
-  height: 80rpx;
-  padding: 0 24rpx;
-  background: #faf7f5;
-  border: 2rpx solid #e8e0d8;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: #2d241c;
-  box-sizing: border-box;
-  transition: all 0.2s ease;
-}
-
-.text-input:focus {
-  border-color: #f59e0b;
-  background: #ffffff;
-}
-
-/* ===== 日期下拉选择器 — 与 text-input 视觉一致 ===== */
-.picker-trigger {
-  width: 100%;
-  height: 80rpx;
-  padding: 0 24rpx;
-  background: #faf7f5;
-  border: 2rpx solid #e8e0d8;
-  border-radius: 16rpx;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  box-sizing: border-box;
-  transition: all 0.2s ease;
+  gap: 8rpx;
+  font-size: 24rpx;
+  font-weight: 500;
+  color: #8b7355;
+  margin-bottom: 16rpx;
 }
 
-.picker-trigger:active {
-  border-color: #f59e0b;
-  background: #ffffff;
-}
-
-.picker-value {
+.section-label-icon {
   font-size: 28rpx;
-  color: #2d241c;
 }
 
-.picker-placeholder {
-  font-size: 28rpx;
-  color: #c4b5a5;
-}
-
-.picker-arrow {
-  font-size: 20rpx;
-  color: #c4b5a5;
-  flex-shrink: 0;
-}
-
-/* ===== 分类选择 — 仿 Web 端 emoji 网格 ===== */
 .category-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 12rpx;
-  max-height: 320rpx;
+  max-height: 280rpx;
   overflow-y: auto;
-  padding: 8rpx 0;
+  padding: 4rpx;
 }
 
 .category-grid-item {
@@ -141,106 +143,220 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 140rpx;
-  height: 120rpx;
+  width: calc(25% - 9rpx);
+  height: 130rpx;
   background: #faf7f5;
-  border: 2rpx solid #e8e0d8;
+  border: 2rpx solid transparent;
   border-radius: 16rpx;
   transition: all 0.2s ease;
 }
 
 .category-grid-item:active {
-  transform: scale(0.95);
+  transform: scale(0.93);
 }
 
 .category-grid-item.active {
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
   border-color: #fbbf24;
-  box-shadow: 0 4rpx 12rpx rgba(251, 191, 36, 0.3);
+  box-shadow: 0 4rpx 16rpx rgba(251, 191, 36, 0.3);
 }
 
 .category-grid-icon {
   font-size: 36rpx;
-  margin-bottom: 6rpx;
+  margin-bottom: 8rpx;
 }
 
 .category-grid-name {
-  font-size: 22rpx;
-  color: #2d241c;
+  font-size: 20rpx;
+  color: #5a4a3a;
   text-align: center;
+  line-height: 1.2;
 }
 
-/* ===== 备注文本框 ===== */
-.note-textarea {
-  width: 100%;
-  min-height: 100rpx;
-  padding: 20rpx 24rpx;
-  background: #faf7f5;
-  border: 2rpx solid #e8e0d8;
-  border-radius: 16rpx;
+.category-grid-item.active .category-grid-name {
+  color: #2d241c;
+  font-weight: 600;
+}
+
+/* ===== 表单行 ===== */
+.form-row {
+  display: flex;
+  align-items: center;
+  padding: 24rpx;
+  border-bottom: 1rpx solid #f0ebe5;
+  gap: 16rpx;
+}
+
+.form-row:last-child {
+  border-bottom: none;
+}
+
+.form-row-textarea {
+  align-items: flex-start;
+}
+
+.form-row-icon {
+  font-size: 32rpx;
+  flex-shrink: 0;
+}
+
+.form-row-icon-top {
+  margin-top: 6rpx;
+}
+
+.form-row-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.form-row-label {
+  font-size: 22rpx;
+  color: #a89580;
+  font-weight: 500;
+}
+
+.form-row-value {
   font-size: 28rpx;
   color: #2d241c;
-  box-sizing: border-box;
-  transition: all 0.2s ease;
 }
 
-.note-textarea:focus {
-  border-color: #f59e0b;
-  background: #ffffff;
+.form-row-value.placeholder {
+  color: #c4b5a5;
+}
+
+.form-row-arrow {
+  font-size: 20rpx;
+  color: #c4b5a5;
+  flex-shrink: 0;
+}
+
+/* ===== 文本输入 ===== */
+.form-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-size: 28rpx;
+  color: #2d241c;
+  padding: 0;
+}
+
+.form-input::placeholder {
+  color: #c4b5a5;
+}
+
+/* ===== 备注 — 默认一行，自动增高 ===== */
+.form-textarea {
+  width: 100%;
+  min-height: 44rpx;
+  border: none;
+  background: transparent;
+  font-size: 28rpx;
+  color: #2d241c;
+  line-height: 44rpx;
+  padding: 0;
+}
+
+.form-textarea::placeholder {
+  color: #c4b5a5;
 }
 
 /* ===== 错误提示 ===== */
 .error-text {
   display: block;
-  font-size: 22rpx;
+  font-size: 20rpx;
   color: #ef4444;
-  margin-top: 8rpx;
+  margin-top: 6rpx;
+  margin-left: 48rpx;
 }
 
-/* ===== 提交区域 ===== */
+/* ===== 提交按钮区域 ===== */
 .submit-section {
-  margin: 30rpx 30rpx;
+  margin: 32rpx 24rpx 0;
   display: flex;
-  gap: 20rpx;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
 .submit-btn {
-  flex: 1;
+  width: 100%;
   height: 88rpx;
   line-height: 88rpx;
+  text-align: center;
   background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  color: #ffffff;
+  color: #ffffff !important;
   font-size: 32rpx;
   font-weight: 600;
   border: none;
   border-radius: 44rpx;
-  box-shadow: 0 6rpx 20rpx rgba(245, 158, 11, 0.3);
+  box-shadow: 0 8rpx 24rpx rgba(245, 158, 11, 0.3);
+  transition: all 0.2s ease;
+}
+
+.submit-btn::after {
+  border: none;
 }
 
 .submit-btn:active {
   transform: scale(0.97);
-  opacity: 0.95;
-  box-shadow: 0 3rpx 10rpx rgba(245, 158, 11, 0.2);
+  box-shadow: 0 4rpx 12rpx rgba(245, 158, 11, 0.2);
+}
+
+.submit-btn::after {
+  border: none;
 }
 
 .submit-btn[disabled] {
-  background: #c4b5a5;
+  background: #c4b9aa;
   box-shadow: none;
 }
 
+.submit-btn.expense {
+  background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+  box-shadow: 0 8rpx 24rpx rgba(239, 68, 68, 0.3);
+}
+
+.submit-btn.income {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  box-shadow: 0 8rpx 24rpx rgba(16, 185, 129, 0.3);
+}
+
 .cancel-btn {
-  flex: 1;
-  height: 88rpx;
-  line-height: 88rpx;
+  width: 100%;
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
   background: #ffffff;
-  color: #8b7355;
-  font-size: 32rpx;
+  color: #8b7355 !important;
+  font-size: 28rpx;
   font-weight: 500;
   border: 2rpx solid #e8e0d8;
-  border-radius: 44rpx;
+  border-radius: 40rpx;
+}
+
+.cancel-btn::after {
+  border: none;
 }
 
 .cancel-btn:active {
-  background: #faf7f5;
+  background: #f5f0eb;
   border-color: #c4b5a5;
+}
+
+.cancel-btn::after {
+  border: none;
+}
+
+/* ===== 加载状态 ===== */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 120rpx 0;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #a89580;
 }
