@@ -171,7 +171,7 @@ const BillDetailPage: React.FC = () => {
       <View className='amount-section'>
         <Text className='amount-label'>{isIncome ? '收入' : '支出'}金额</Text>
         <Text className={`amount-value ${isIncome ? 'income' : 'expense'}`}>
-          {isIncome ? '+' : '-'}¥{bill.amount.toFixed(2)}
+          ¥{bill.amount.toFixed(2)}
         </Text>
       </View>
 
