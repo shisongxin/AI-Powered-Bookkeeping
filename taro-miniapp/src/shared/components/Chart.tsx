@@ -140,38 +140,79 @@ const Chart: React.FC<ChartProps> = ({ option, style, className, height = 300 })
     )
   }
 
-  /* ===== 条状图 ===== */
+  /* ===== 条状图 — 横向设计，适配手机宽度 ===== */
   if (type === 'bar') {
     const xData: string[] = option?.xAxis?.data || []
     const barData: number[] = s0?.data?.map((d: any) => typeof d === 'object' ? d.value : d) || []
     const maxVal = Math.max(...barData, 1)
     const [touchBarIndex, setTouchBarIndex] = useState<number | null>(null)
+    const totalExpense = barData.reduce((s: number, v: number) => s + v, 0)
 
     return (
-      <View style={{ ...style, height: `${height}rpx`, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className={className}>
-        <View style={{ display: 'flex', alignItems: 'flex-end', gap: '12rpx', height: '240rpx', paddingBottom: '40rpx' }}>
+      <View style={{ ...style, display: 'flex', flexDirection: 'column', justifyContent: 'center' }} className={className}>
+        {/* 顶部汇总 */}
+        <View style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16rpx', padding: '0 4rpx' }}>
+          <Text style={{ fontSize: '24rpx', color: '#8b7355' }}>消费前 {xData.length} 分类</Text>
+          <Text style={{ fontSize: '24rpx', color: '#8b7355' }}>合计 ¥{totalExpense.toFixed(0)}</Text>
+        </View>
+
+        {/* 横向条形列表 */}
+        <View style={{ display: 'flex', flexDirection: 'column', gap: '14rpx' }}>
           {xData.map((name, i) => {
             const val = barData[i] || 0
-            const barH = maxVal > 0 ? (val / maxVal) * 200 : 0
+            const barPct = maxVal > 0 ? (val / maxVal) * 100 : 0
             const isTouched = touchBarIndex === i
+            const pct = totalExpense > 0 ? ((val / totalExpense) * 100).toFixed(1) : '0.0'
+
             return (
               <View
                 key={name}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', height: '100%' }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12rpx',
+                  padding: '12rpx 16rpx', borderRadius: '14rpx',
+                  backgroundColor: isTouched ? '#fef3c7' : 'transparent',
+                  transition: 'background 0.15s ease',
+                }}
                 onTouchStart={() => setTouchBarIndex(i)}
                 onTouchEnd={() => setTouchBarIndex(null)}
               >
-                <Text style={{ fontSize: isTouched ? '22rpx' : '20rpx', color: isTouched ? '#92400e' : '#2d241c', marginBottom: '4rpx', fontWeight: isTouched ? '600' : 'normal' }}>
-                  {isTouched ? `¥${val.toFixed(2)}` : `¥${val.toFixed(0)}`}
+                {/* 排名 */}
+                <Text style={{
+                  fontSize: '20rpx', color: isTouched ? '#92400e' : '#c4b5a5',
+                  width: '28rpx', textAlign: 'center', fontWeight: '600', flexShrink: 0,
+                }}>
+                  {i + 1}
                 </Text>
-                <View style={{
-                  width: '100%', height: `${barH}rpx`, backgroundColor: isTouched ? COLORS[i % COLORS.length] + 'dd' : COLORS[i % COLORS.length],
-                  borderRadius: '8rpx 8rpx 0 0', minHeight: '4rpx',
-                  opacity: touchBarIndex !== null && !isTouched ? 0.5 : 1,
-                }} />
-                <Text style={{ fontSize: '20rpx', color: isTouched ? '#92400e' : '#8b7355', marginTop: '8rpx', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', fontWeight: isTouched ? '500' : 'normal' }}>
-                  {name.length > 4 ? name.slice(0, 4) + '..' : name}
+                {/* 分类名 */}
+                <Text style={{
+                  fontSize: '24rpx', color: isTouched ? '#92400e' : '#2d241c',
+                  width: '80rpx', flexShrink: 0, fontWeight: isTouched ? '600' : '500',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}>
+                  {name.length > 4 ? name.slice(0, 4) : name}
                 </Text>
+                {/* 条形 + 金额 */}
+                <View style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10rpx', minWidth: 0 }}>
+                  <View style={{
+                    height: '28rpx', borderRadius: '6rpx',
+                    width: `${Math.max(barPct, 2)}%`,
+                    backgroundColor: isTouched ? COLORS[i % COLORS.length] : COLORS[i % COLORS.length] + '99',
+                    minWidth: '8rpx',
+                    transition: 'width 0.3s ease',
+                  }} />
+                  <Text style={{
+                    fontSize: isTouched ? '22rpx' : '20rpx',
+                    color: isTouched ? '#92400e' : '#2d241c',
+                    fontWeight: isTouched ? '700' : '600', flexShrink: 0,
+                  }}>
+                    {isTouched ? `¥${val.toFixed(2)}` : `¥${val.toFixed(0)}`}
+                  </Text>
+                  {isTouched && (
+                    <Text style={{ fontSize: '18rpx', color: '#a89580', flexShrink: 0 }}>
+                      {pct}%
+                    </Text>
+                  )}
+                </View>
               </View>
             )
           })}

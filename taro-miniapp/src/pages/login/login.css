@@ -1,64 +1,155 @@
-/* 登录页样式 — 仿 Web 端深色+金色风格 */
+/* ===== 登录页样式 — 对齐网页端 Web/Login.tsx =====
+   设计语言：espresso + gold 配色，glass-card 风格 */
+
 .login-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 100vh;
   padding: 40rpx;
-  background: linear-gradient(135deg, #2d241c 0%, #1c1917 100%);
+  /* 对齐网页端：浅色背景，非深色 */
+  background: #faf7f5;
 }
 
+/* ===== 登录卡片 — glass 效果对齐网页端 ===== */
 .login-card {
   width: 100%;
-  max-width: 640rpx;
-  padding: 60rpx 48rpx;
-  background: #ffffff;
-  border-radius: 32rpx;
-  box-shadow: 0 24rpx 80rpx rgba(0, 0, 0, 0.3);
+  max-width: 600rpx;
+  padding: 48rpx 44rpx;
+  /* glass-card：半透明白色 + 边框 */
+  background: rgba(255, 255, 255, 0.72);
+  border: 1rpx solid rgba(255, 255, 255, 0.6);
+  border-radius: 24rpx;
+  box-shadow: 0 12rpx 48rpx rgba(45, 36, 28, 0.08);
+  box-sizing: border-box;
 }
 
 /* ===== Logo 区域 ===== */
 .logo-section {
   text-align: center;
-  margin-bottom: 60rpx;
+  margin-bottom: 48rpx;
 }
 
 .logo-icon {
-  font-size: 96rpx;
-  margin-bottom: 20rpx;
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto 24rpx;
+  border-radius: 24rpx;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8rpx 32rpx rgba(245, 158, 11, 0.3);
+}
+
+.logo-icon-text {
+  font-size: 56rpx;
+  color: #ffffff;
+  font-weight: 700;
 }
 
 .logo-title {
   display: block;
-  font-size: 48rpx;
+  font-size: 44rpx;
   font-weight: 700;
+  /* 对齐网页端：espresso-800 深色标题 */
   color: #2d241c;
-  margin-bottom: 12rpx;
+  margin-bottom: 10rpx;
+  letter-spacing: 2rpx;
 }
 
 .logo-subtitle {
   display: block;
-  font-size: 26rpx;
-  color: #a89580;
+  font-size: 24rpx;
+  /* 对齐网页端：espresso-400 */
+  color: #8b7355;
 }
 
-/* ===== 错误提示 ===== */
+/* ===== 错误提示 — 对齐网页端 coral 色系 ===== */
 .error-message {
   padding: 20rpx 24rpx;
-  margin-bottom: 30rpx;
+  margin-bottom: 28rpx;
   background: #fef2f2;
   border: 1rpx solid #fecaca;
   border-radius: 16rpx;
 }
 
 .error-text {
-  font-size: 26rpx;
+  font-size: 24rpx;
   color: #ef4444;
+  display: block;
 }
 
 /* ===== 登录表单 ===== */
 .login-form {
-  margin-bottom: 40rpx;
+  margin-bottom: 36rpx;
+}
+
+/* ===== 输入框组 ===== */
+.input-group {
+  margin-bottom: 28rpx;
+}
+
+.input-label {
+  display: block;
+  font-size: 24rpx;
+  /* 对齐网页端：espresso-500 */
+  color: #8b7355;
+  margin-bottom: 10rpx;
+  font-weight: 500;
+}
+
+.input-field {
+  width: 100%;
+  height: 88rpx;
+  padding: 0 24rpx;
+  /* 对齐网页端：半透明白色背景 + espresso-200 边框 */
+  background: rgba(255, 255, 255, 0.80);
+  border: 2rpx solid #e8e0d8;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  color: #2d241c;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.input-field:focus {
+  border-color: #f59e0b;
+  /* 对齐网页端：金色聚焦环 */
+  box-shadow: 0 0 0 6rpx rgba(245, 158, 11, 0.08);
+  background: #ffffff;
+}
+
+/* ===== 密码登录按钮 — 金色渐变对齐网页端 ===== */
+.password-login-btn {
+  width: 100%;
+  height: 88rpx;
+  line-height: 88rpx;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 600;
+  border: none;
+  border-radius: 44rpx;
+  /* 对齐网页端：shadow-gold */
+  box-shadow: 0 6rpx 24rpx rgba(245, 158, 11, 0.25);
+  margin-bottom: 12rpx;
+  transition: all 0.2s ease;
+}
+
+.password-login-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 3rpx 12rpx rgba(245, 158, 11, 0.2);
+}
+
+.password-login-btn::after {
+  border: none;
+}
+
+.password-login-btn[disabled] {
+  background: #c4b5a5;
+  box-shadow: none;
+  opacity: 0.6;
 }
 
 /* ===== 微信登录按钮 ===== */
@@ -72,112 +163,24 @@
   font-weight: 600;
   border: none;
   border-radius: 44rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 6rpx 20rpx rgba(16, 185, 129, 0.3);
+  margin-bottom: 12rpx;
+  box-shadow: 0 6rpx 24rpx rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease;
 }
 
 .wechat-login-btn:active {
   transform: scale(0.97);
-  opacity: 0.9;
+  box-shadow: 0 3rpx 12rpx rgba(16, 185, 129, 0.2);
+}
+
+.wechat-login-btn::after {
+  border: none;
 }
 
 .wechat-login-btn[disabled] {
   background: #c4b5a5;
   box-shadow: none;
-}
-
-/* ===== 密码登录按钮 ===== */
-.password-login-btn {
-  width: 100%;
-  height: 88rpx;
-  line-height: 88rpx;
-  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-  color: #ffffff;
-  font-size: 32rpx;
-  font-weight: 600;
-  border: none;
-  border-radius: 44rpx;
-  margin-bottom: 24rpx;
-  box-shadow: 0 6rpx 20rpx rgba(245, 158, 11, 0.3);
-}
-
-.password-login-btn:active {
-  transform: scale(0.97);
-  opacity: 0.9;
-}
-
-.password-login-btn[disabled] {
-  background: #c4b5a5;
-  box-shadow: none;
-}
-
-/* ===== 输入框组 ===== */
-.input-group {
-  margin-bottom: 30rpx;
-}
-
-.input-label {
-  display: block;
-  font-size: 26rpx;
-  color: #8b7355;
-  margin-bottom: 12rpx;
-  font-weight: 500;
-}
-
-.input-field {
-  width: 100%;
-  height: 80rpx;
-  padding: 0 24rpx;
-  background: #faf7f5;
-  border: 2rpx solid #e8e0d8;
-  border-radius: 16rpx;
-  font-size: 28rpx;
-  color: #2d241c;
-  box-sizing: border-box;
-  transition: all 0.2s ease;
-}
-
-.input-field:focus {
-  border-color: #f59e0b;
-  background: #ffffff;
-}
-
-/* ===== 模式切换 ===== */
-.mode-switch {
-  text-align: center;
-  padding: 16rpx 0;
-}
-
-.switch-link {
-  font-size: 26rpx;
-  color: #f59e0b;
-  font-weight: 500;
-}
-
-.switch-link:active {
-  opacity: 0.7;
-}
-
-/* ===== 底部 ===== */
-.login-footer {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-  padding-top: 30rpx;
-  border-top: 1rpx solid #f0ebe5;
-}
-
-.footer-text {
-  font-size: 22rpx;
-  color: #a89580;
-  margin: 0 4rpx;
-}
-
-.footer-link {
-  font-size: 22rpx;
-  color: #f59e0b;
-  margin: 0 4rpx;
+  opacity: 0.6;
 }
 
 /* ===== 微信登录描述 ===== */
@@ -191,27 +194,68 @@
   color: #a89580;
 }
 
-/* ===== 注册入口 ===== */
+/* ===== 模式切换 ===== */
+.mode-switch {
+  text-align: center;
+  padding: 12rpx 0;
+}
+
+.switch-link {
+  font-size: 24rpx;
+  /* 对齐网页端：gold-600 注册链接色 */
+  color: #d97706;
+  font-weight: 500;
+}
+
+.switch-link:active {
+  opacity: 0.6;
+}
+
+/* ===== 注册入口 — 对齐网页端 ===== */
 .register-entry {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20rpx 0;
-  margin-bottom: 20rpx;
+  padding: 16rpx 0;
+  margin-bottom: 24rpx;
 }
 
 .register-text {
-  font-size: 26rpx;
-  color: #a89580;
+  font-size: 24rpx;
+  color: #8b7355;
 }
 
 .register-link {
-  font-size: 26rpx;
-  color: #f59e0b;
+  font-size: 24rpx;
+  /* 对齐网页端：gold-600 */
+  color: #d97706;
   font-weight: 600;
   margin-left: 8rpx;
 }
 
 .register-link:active {
-  opacity: 0.7;
+  opacity: 0.6;
+}
+
+/* ===== 底部协议 ===== */
+.login-footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 24rpx;
+  border-top: 1rpx solid rgba(240, 235, 229, 0.6);
+}
+
+.footer-text {
+  font-size: 22rpx;
+  color: #a89580;
+  margin: 0 4rpx;
+}
+
+.footer-link {
+  font-size: 22rpx;
+  /* 对齐网页端：gold-600 */
+  color: #d97706;
+  margin: 0 4rpx;
 }

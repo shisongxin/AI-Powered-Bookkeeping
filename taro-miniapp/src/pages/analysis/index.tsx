@@ -725,7 +725,7 @@ const AnalysisPage: React.FC = () => {
           {categoryData.length > 0 ? (
             chartType === 'pie'
               ? <Chart key="pie" option={pieOption} height={320} />
-              : <Chart key="bar" option={barOption} height={300} />
+              : <Chart key="bar" option={barOption} />
           ) : (
             <View className='empty-state'>
               <Text className='empty-icon'>📊</Text>

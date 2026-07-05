@@ -1,5 +1,6 @@
 export default {
   pages: [
+    'pages/login/index',
     'pages/analysis/index',
     'pages/bills/list',
     'pages/bills/add',
@@ -7,7 +8,6 @@ export default {
     'pages/chat/index',
     'pages/categories/index',
     'pages/mine/index',
-    'pages/login/index',
     'pages/register/index',
     'pages/budget/index'
   ],

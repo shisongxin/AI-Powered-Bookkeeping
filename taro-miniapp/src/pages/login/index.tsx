@@ -8,7 +8,7 @@
  * 登录成功后调用 /auth/me 获取完整用户信息，
  * 保证两端用户数据一致
  */
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { View, Text, Input, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useAuth } from '../../shared/hooks/useAuth'
@@ -23,6 +23,14 @@ const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const { isLoading, error, clearError, login: authLogin } = useAuth()
+
+  // 若已登录，自动跳转首页
+  useEffect(() => {
+    const token = Taro.getStorageSync('token')
+    if (token) {
+      Taro.switchTab({ url: '/pages/analysis/index' })
+    }
+  }, [])
 
   /** 登录成功后统一处理：获取用户信息 + 存储 token */
   const handleLoginSuccess = useCallback(async (accessToken: string, fallbackNickname: string) => {
@@ -95,11 +103,11 @@ const LoginPage: React.FC = () => {
   return (
     <View className='login-container'>
       <View className='login-card'>
-        {/* Logo 区域 */}
+        {/* Logo 区域 — 对齐网页端 brand panel 风格 */}
         <View className='logo-section'>
           <View className='logo-icon'><Text>💰</Text></View>
-          <Text className='logo-title'>AI记账</Text>
-          <Text className='logo-subtitle'>智能财务管理助手</Text>
+          <Text className='logo-title'>BillAgent</Text>
+          <Text className='logo-subtitle'>AI 驱动的智能记账助手</Text>
         </View>
 
         {/* 错误提示 */}
