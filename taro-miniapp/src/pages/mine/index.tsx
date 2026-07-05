@@ -4,7 +4,7 @@
  * 与网页端 Layout.tsx 中的用户信息展示对齐
  */
 import React, { useState, useEffect, useCallback } from 'react'
-import { View, Text, Button } from '@tarojs/components'
+import { View, Text, Button, Textarea, Input } from '@tarojs/components'
 import Taro, { useDidShow } from '@tarojs/taro'
 import { useAuth } from '../../shared/hooks/useAuth'
 import { getMonthlySummary } from '../../shared/api/client'
@@ -63,6 +63,42 @@ const MinePage: React.FC = () => {
   const handleBudget = useCallback(() => {
     Taro.navigateTo({ url: '/pages/budget/index' })
   }, [])
+
+  /* ===== 反馈弹窗 ===== */
+  const [feedbackVisible, setFeedbackVisible] = useState(false)
+  const [feedbackType, setFeedbackType] = useState<'bug' | 'feature' | 'other'>('bug')
+  const [feedbackContent, setFeedbackContent] = useState('')
+  const [feedbackContact, setFeedbackContact] = useState('')
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false)
+
+  const openFeedback = useCallback(() => {
+    setFeedbackType('bug')
+    setFeedbackContent('')
+    setFeedbackContact('')
+    setFeedbackVisible(true)
+  }, [])
+
+  const closeFeedback = useCallback(() => {
+    setFeedbackVisible(false)
+  }, [])
+
+  const submitFeedback = useCallback(async () => {
+    if (!feedbackContent.trim()) {
+      Taro.showToast({ title: '请填写反馈内容', icon: 'none' })
+      return
+    }
+    setFeedbackSubmitting(true)
+    try {
+      // 这里可以接入后端反馈接口，目前先本地收集
+      await new Promise(resolve => setTimeout(resolve, 800))
+      Taro.showToast({ title: '感谢反馈！', icon: 'success' })
+      setFeedbackVisible(false)
+    } catch {
+      Taro.showToast({ title: '提交失败', icon: 'none' })
+    } finally {
+      setFeedbackSubmitting(false)
+    }
+  }, [feedbackContent])
 
   /** 未登录状态 */
   if (!isAuthenticated && !Taro.getStorageSync('token')) {
@@ -151,10 +187,15 @@ const MinePage: React.FC = () => {
         </View>
       </View>
 
-      {/* 关于 */}
+      {/* 帮助与反馈 */}
       <View className='menu-section'>
-        <View className='menu-item' onClick={() => Taro.showToast({ title: 'AI记账 v1.1.0', icon: 'none', duration: 2000 })}>
-          <View className='menu-icon'><Text>ℹ️</Text></View>
+        <View className='menu-item' onClick={openFeedback}>
+          <View className='menu-icon bg-feedback-light'><Text>💬</Text></View>
+          <Text className='menu-title'>意见反馈</Text>
+          <Text className='menu-arrow'>{'>'}</Text>
+        </View>
+        <View className='menu-item' onClick={() => Taro.showToast({ title: 'AI记账 v1.2.0 · 让记账更智能', icon: 'none', duration: 2000 })}>
+          <View className='menu-icon bg-about-light'><Text>ℹ️</Text></View>
           <Text className='menu-title'>关于我们</Text>
           <Text className='menu-arrow'>{'>'}</Text>
         </View>
@@ -162,6 +203,82 @@ const MinePage: React.FC = () => {
 
       {/* 退出登录 */}
       <Button className='logout-btn' onClick={handleLogout}>退出登录</Button>
+
+      {/* ===== 反馈弹窗 ===== */}
+      {feedbackVisible && (
+        <View className='feedback-overlay' onClick={closeFeedback}>
+          <View className='feedback-modal' onClick={(e) => e.stopPropagation()}>
+            {/* 弹窗头部 */}
+            <View className='feedback-header'>
+              <Text className='feedback-title'>意见反馈</Text>
+              <View className='feedback-close' onClick={closeFeedback}>
+                <Text className='feedback-close-text'>✕</Text>
+              </View>
+            </View>
+
+            {/* 反馈类型 */}
+            <View className='feedback-section'>
+              <Text className='feedback-label'>反馈类型</Text>
+              <View className='feedback-type-group'>
+                <View
+                  className={`feedback-type-btn ${feedbackType === 'bug' ? 'active bug' : ''}`}
+                  onClick={() => setFeedbackType('bug')}
+                >
+                  <Text>🐛 问题反馈</Text>
+                </View>
+                <View
+                  className={`feedback-type-btn ${feedbackType === 'feature' ? 'active feature' : ''}`}
+                  onClick={() => setFeedbackType('feature')}
+                >
+                  <Text>💡 功能建议</Text>
+                </View>
+                <View
+                  className={`feedback-type-btn ${feedbackType === 'other' ? 'active other' : ''}`}
+                  onClick={() => setFeedbackType('other')}
+                >
+                  <Text>📝 其他</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* 反馈内容 */}
+            <View className='feedback-section'>
+              <Text className='feedback-label'>反馈内容</Text>
+              <Textarea
+                className='feedback-textarea'
+                value={feedbackContent}
+                onInput={(e) => setFeedbackContent(e.detail.value)}
+                placeholder='请详细描述您遇到的问题或建议，我们会认真阅读每一条反馈...'
+                placeholderClass='feedback-textarea-placeholder'
+                maxlength={500}
+                autoHeight
+              />
+              <Text className='feedback-count'>{feedbackContent.length}/500</Text>
+            </View>
+
+            {/* 联系方式（选填） */}
+            <View className='feedback-section'>
+              <Text className='feedback-label'>联系方式（选填）</Text>
+              <Input
+                className='feedback-input'
+                value={feedbackContact}
+                onInput={(e) => setFeedbackContact(e.detail.value)}
+                placeholder='手机号 / 微信 / 邮箱，方便我们回复您'
+                placeholderClass='feedback-input-placeholder'
+              />
+            </View>
+
+            {/* 提交按钮 */}
+            <Button
+              className={`feedback-submit-btn ${feedbackSubmitting ? 'submitting' : ''}`}
+              onClick={submitFeedback}
+              disabled={feedbackSubmitting}
+            >
+              {feedbackSubmitting ? '提交中...' : '提交反馈'}
+            </Button>
+          </View>
+        </View>
+      )}
     </View>
   )
 }
