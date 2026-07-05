@@ -31,7 +31,7 @@
 
 ### 1. RAG + Agent 智能记账（核心创新）
 
-![AI Chat Demo](figure/ai-chat-demo.gif)
+<img src="figure/ai-chat-demo.gif" width="520" alt="AI Chat Demo"/>
 
 **痛点**：传统记账 APP 需要用户手动选择分类、输入金额，操作繁琐，难以坚持。
 
@@ -51,8 +51,12 @@
 
 <table>
   <tr>
-    <td align="center"><img src="figure/multi-platform-web.PNG" width="400"/><br/>Web 端</td>
-    <td align="center"><img src="figure/multi-platform-wx.PNG" width="400"/><br/>微信小程序</td>
+    <td align="center"><img src="figure/multi-platform-web.PNG" width="280" alt="Web 端"/></td>
+    <td align="center"><img src="figure/multi-platform-wx.PNG" width="200" alt="微信小程序"/></td>
+  </tr>
+  <tr>
+    <td align="center" style="padding-top:8px"><b>Web 端</b></td>
+    <td align="center" style="padding-top:8px"><b>微信小程序</b></td>
   </tr>
 </table>
 
@@ -66,7 +70,7 @@
 
 ### 3. 多格式账单导入 + 自动解析
 
-![File Upload](figure/file-upload.PNG)
+<img src="figure/file-upload.PNG" width="520" alt="File Upload"/>
 
 **场景**：用户有大量微信/支付宝/银行账单文件，需要批量导入。
 
@@ -78,7 +82,7 @@
 
 ### 4. OCR 图片识别（双引擎）
 
-![OCR Demo](figure/ocr-demo.PNG)
+<img src="figure/ocr-demo.PNG" width="520" alt="OCR Demo"/>
 
 **场景**：用户拍摄收据/账单截图，希望自动识别并记账。
 
@@ -90,7 +94,7 @@
 
 ### 5. 月度预算规划 + AI 建议
 
-![Budget Demo](figure/budget-demo.PNG)
+<img src="figure/budget-demo.PNG" width="520" alt="Budget Demo"/>
 
 **场景**：用户希望了解自己的消费趋势，并获得预算建议。
 
@@ -162,13 +166,12 @@
 
 ### 流水分析
 
-![Analysis](figure/analysis-page.PNG)
+<img src="figure/analysis-page.PNG" width="520" alt="Analysis Web"/>
 
 <details>
-<summary>手机端流水分析视图</summary>
-
-![Analysis Mobile](figure/analysispage.png)
-
+<summary>📱 手机端流水分析视图</summary>
+<br/>
+<img src="figure/analysispage.png" width="180" alt="Analysis Mobile"/>
 </details>
 
 - 月度收支汇总卡片
@@ -180,7 +183,7 @@
 
 ### 账单明细
 
-![Bills](figure/bills-page.PNG)
+<img src="figure/bills-page.PNG" width="520" alt="Bills"/>
 
 - 按月折叠卡片展示
 - 关键词搜索 + 分类/日期/类型筛选
@@ -191,13 +194,12 @@
 
 ### AI 对话记账
 
-![Chat](figure/chat-page.PNG)
+<img src="figure/chat-page.PNG" width="520" alt="AI Chat"/>
 
 <details>
-<summary>更多 AI 对话示例</summary>
-
-![AI Chat Example](figure/image.png)
-
+<summary>💬 更多 AI 对话示例</summary>
+<br/>
+<img src="figure/image.png" width="520" alt="AI Chat Example"/>
 </details>
 
 - SSE 流式输出，实时状态指示器
@@ -210,7 +212,7 @@
 
 ### 分类管理
 
-![Categories](figure/categories-page.PNG)
+<img src="figure/categories-page.PNG" width="520" alt="Categories"/>
 
 - 卡片网格 + 图标/颜色/关键词管理
 - 30 个预设图标 + 10 个预设颜色
@@ -220,7 +222,7 @@
 
 ### 预算管理
 
-![Budget](figure/budget-page.PNG)
+<img src="figure/budget-page.PNG" width="520" alt="Budget"/>
 
 - 预算执行进度 + 状态徽章（正常/接近上限/已超支）
 - 手动设置 + 智能生成（上月消费 + 10%）
@@ -351,7 +353,7 @@ pytest tests/ -v
 
 ## 🔒 安全特性
 
-![Login Page web](figure/loginpage.png)
+<img src="figure/loginpage.png" width="420" alt="Login Page"/>
 
 | 特性 | 实现 |
 |---|---|
