@@ -90,6 +90,42 @@
   background: #ffffff;
 }
 
+/* ===== 日期下拉选择器 — 与 text-input 视觉一致 ===== */
+.picker-trigger {
+  width: 100%;
+  height: 80rpx;
+  padding: 0 24rpx;
+  background: #faf7f5;
+  border: 2rpx solid #e8e0d8;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.picker-trigger:active {
+  border-color: #f59e0b;
+  background: #ffffff;
+}
+
+.picker-value {
+  font-size: 28rpx;
+  color: #2d241c;
+}
+
+.picker-placeholder {
+  font-size: 28rpx;
+  color: #c4b5a5;
+}
+
+.picker-arrow {
+  font-size: 20rpx;
+  color: #c4b5a5;
+  flex-shrink: 0;
+}
+
 /* ===== 分类选择 — 仿 Web 端 emoji 网格 ===== */
 .category-grid {
   display: flex;

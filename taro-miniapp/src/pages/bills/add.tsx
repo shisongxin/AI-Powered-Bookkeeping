@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react'
-import { View, Text, Textarea, Button, Input } from '@tarojs/components'
+import { View, Text, Textarea, Button, Input, Picker } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import AmountInput from '../../shared/components/AmountInput'
 import { validateAmount, validateDate } from '../../shared/utils/validation'
@@ -244,16 +244,21 @@ const AddBillPage: React.FC = () => {
           />
         </View>
 
-        {/* 日期 */}
+        {/* 日期 — 下拉选择器 */}
         <View className='form-section'>
           <Text className='section-label'>日期</Text>
-          <Input
-            className='text-input'
-            type='text'
+          <Picker
+            mode='date'
             value={date}
-            onInput={(e) => setDate(e.detail.value)}
-            placeholder='YYYY-MM-DD'
-          />
+            onChange={(e) => setDate(e.detail.value)}
+          >
+            <View className='picker-trigger'>
+              <Text className={date ? 'picker-value' : 'picker-placeholder'}>
+                {date || '选择日期'}
+              </Text>
+              <Text className='picker-arrow'>▼</Text>
+            </View>
+          </Picker>
           {errors.date && <Text className='error-text'>{errors.date}</Text>}
         </View>
 

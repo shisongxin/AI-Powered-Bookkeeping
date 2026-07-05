@@ -248,22 +248,21 @@ const CategoriesPage: React.FC = () => {
               <View className='form-field-full'>
                 <Text className='field-label'>颜色</Text>
                 <View className='color-picker-row'>
-                  <View className='color-native-wrapper'>
-                    <Picker
-                      mode='selector'
-                      range={PRESET_COLORS}
-                      rangeKey=''
-                      onChange={handleColorChange}
-                    >
-                      <View className='color-native-trigger'>
-                        <View
-                          className='color-native-swatch'
-                          style={{ backgroundColor: form.color || '#f59e0b' }}
-                        />
-                        <Text className='color-native-hint'>{form.color || '选择'}</Text>
-                      </View>
-                    </Picker>
-                  </View>
+                  <Picker
+                    mode='selector'
+                    range={PRESET_COLORS}
+                    rangeKey=''
+                    onChange={handleColorChange}
+                  >
+                    <View className='color-native-picker'>
+                      <View
+                        className='color-native-swatch'
+                        style={{ backgroundColor: form.color || '#f59e0b' }}
+                      />
+                      <Text className='color-native-hint'>{form.color || '选择'}</Text>
+                      <Text style={{ fontSize: '20rpx', color: '#c4b5a5' }}>▼</Text>
+                    </View>
+                  </Picker>
                   <View className='color-swatches'>
                     {PRESET_COLORS.map(c => (
                       <View

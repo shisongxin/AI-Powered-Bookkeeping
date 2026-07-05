@@ -106,6 +106,12 @@
   flex-direction: column;
 }
 
+.form-field-full {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .field-label {
   display: block;
   font-size: 22rpx;
@@ -135,23 +141,23 @@
 /* ===== 图标选择器 ===== */
 .icon-picker-row {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12rpx;
 }
 
 .icon-picker-wrapper {
-  flex: 1;
-  position: relative;
+  width: 100%;
 }
 
 .icon-picker-trigger {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 12rpx;
-  padding: 16rpx 20rpx;
+  padding: 14rpx 24rpx;
   background: #f5f0eb;
   border: 2rpx solid #e8e0d8;
   border-radius: 16rpx;
+  align-self: flex-start;
 }
 
 .icon-picker-trigger:active {
@@ -164,7 +170,6 @@
 }
 
 .icon-trigger-hint {
-  flex: 1;
   font-size: 24rpx;
   color: #a89580;
 }
@@ -172,34 +177,27 @@
 .icon-trigger-arrow {
   font-size: 20rpx;
   color: #c4b5a5;
+  margin-left: auto;
 }
 
 .icon-picker-dropdown {
-  position: absolute;
-  top: calc(100% + 8rpx);
-  left: 0;
-  right: 0;
-  background: #ffffff;
-  border: 2rpx solid #e8e0d8;
-  border-radius: 16rpx;
-  box-shadow: 0 8rpx 32rpx rgba(45, 36, 28, 0.12);
-  padding: 16rpx;
-  z-index: 30;
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 8rpx;
-  max-height: 320rpx;
-  overflow-y: auto;
+  gap: 12rpx;
+  padding: 16rpx 0;
 }
 
 .icon-option {
-  width: 64rpx;
-  height: 64rpx;
+  width: 72rpx;
+  height: 72rpx;
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 12rpx;
+  border-radius: 14rpx;
   background: #faf7f5;
+  border: 2rpx solid transparent;
+  transition: all 0.15s ease;
 }
 
 .icon-option:active {
@@ -208,7 +206,7 @@
 
 .icon-option.selected {
   background: #fef3c7;
-  box-shadow: 0 0 0 3rpx #f59e0b;
+  border-color: #f59e0b;
 }
 
 .icon-option-text {
@@ -216,13 +214,13 @@
 }
 
 .icon-custom-input {
-  width: 120rpx;
-  height: 80rpx;
-  padding: 0 12rpx;
+  width: 160rpx;
+  height: 76rpx;
+  padding: 0 16rpx;
   background: #f5f0eb;
   border: 2rpx solid #e8e0d8;
   border-radius: 16rpx;
-  font-size: 24rpx;
+  font-size: 28rpx;
   color: #2d241c;
   text-align: center;
   box-sizing: border-box;
@@ -231,25 +229,19 @@
 /* ===== 颜色选择器 ===== */
 .color-picker-row {
   display: flex;
-  align-items: center;
-  gap: 16rpx;
+  flex-direction: column;
+  gap: 12rpx;
 }
 
-.color-native-wrapper {
-  width: 140rpx;
-  height: 80rpx;
-  border-radius: 16rpx;
-  overflow: hidden;
+.color-native-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 14rpx 24rpx;
   background: #f5f0eb;
   border: 2rpx solid #e8e0d8;
-}
-
-.color-native-trigger {
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  padding: 0 16rpx;
-  height: 100%;
+  border-radius: 16rpx;
+  align-self: flex-start;
 }
 
 .color-native-swatch {
@@ -260,20 +252,21 @@
 }
 
 .color-native-hint {
-  font-size: 22rpx;
+  font-size: 26rpx;
   color: #8b7355;
 }
 
 .color-swatches {
-  flex: 1;
+  width: 100%;
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
-  gap: 10rpx;
+  gap: 12rpx;
 }
 
 .color-swatch {
-  width: 52rpx;
-  height: 52rpx;
+  width: 56rpx;
+  height: 56rpx;
   border-radius: 14rpx;
   border: 3rpx solid transparent;
   transition: all 0.15s ease;
