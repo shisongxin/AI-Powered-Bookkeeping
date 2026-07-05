@@ -72,7 +72,7 @@ const RegisterPage: React.FC = () => {
       <View className='register-card'>
         {/* Logo */}
         <View className='logo-section'>
-          <View className='logo-icon'><Text>💰</Text></View>
+          <View className='logo-icon'><Text style={{ fontSize: '50rpx', lineHeight: 1 }}>💰</Text></View>
           <Text className='logo-title'>创建账号</Text>
           <Text className='logo-subtitle'>开始你的智能记账之旅</Text>
         </View>
@@ -115,15 +115,6 @@ const RegisterPage: React.FC = () => {
             <Text className='login-text'>已有账号？</Text>
             <Text className='login-link' onClick={() => Taro.navigateBack()}>去登录 →</Text>
           </View>
-        </View>
-
-        {/* 功能亮点 */}
-        <View className='feature-list'>
-          {['📊 智能分类自动匹配', '🤖 AI 对话记账', '📸 截图 OCR 识别', '📈 可视化流水分析'].map((f, i) => (
-            <View key={i} className='feature-item'>
-              <Text className='feature-text'>{f}</Text>
-            </View>
-          ))}
         </View>
       </View>
     </View>

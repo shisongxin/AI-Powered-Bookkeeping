@@ -105,7 +105,9 @@ const LoginPage: React.FC = () => {
       <View className='login-card'>
         {/* Logo 区域 — 对齐网页端 brand panel 风格 */}
         <View className='logo-section'>
-          <View className='logo-icon'><Text>💰</Text></View>
+          <View className='logo-icon'>
+            <Text className='logo-icon-text'>💰</Text>
+          </View>
           <Text className='logo-title'>BillAgent</Text>
           <Text className='logo-subtitle'>AI 驱动的智能记账助手</Text>
         </View>

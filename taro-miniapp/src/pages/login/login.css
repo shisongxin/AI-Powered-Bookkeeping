@@ -43,9 +43,9 @@
 }
 
 .logo-icon-text {
-  font-size: 56rpx;
+  font-size: 50rpx;
   color: #ffffff;
-  font-weight: 700;
+  line-height: 1;
 }
 
 .logo-title {

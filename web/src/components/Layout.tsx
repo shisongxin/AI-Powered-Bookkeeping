@@ -80,9 +80,9 @@ export default function Layout() {
       >
         {/* Logo */}
         <div className={`flex items-center gap-3 px-5 h-[72px] border-b border-white/5`}>
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600
+          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600
                           flex items-center justify-center text-white font-bold text-sm shadow-gold shrink-0">
-            B
+            💰
           </div>
           {!collapsed && (
             <div className="overflow-hidden">

@@ -29,7 +29,7 @@ export default function Register() {
       <div className="hidden lg:flex w-[42%] bg-gradient-to-br from-espresso-900 via-espresso-800 to-espresso-950 relative overflow-hidden items-center justify-center">
         <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(circle_at_70%_60%,#fbbf24,transparent_60%),radial-gradient(circle_at_30%_30%,#f59e0b,transparent_40%)]" />
         <div className="relative text-center px-12">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold-lg"><span className="text-white font-bold text-xl">B</span></div>
+          <div className="w-28 h-28 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold-lg"><span className="text-white font-bold text-4xl">💰</span></div>
           <h1 className="text-3xl font-display font-bold text-white mb-3 tracking-tight">加入 BillAgent</h1>
           <p className="text-espresso-300 leading-relaxed">创建账户，开启智能记账之旅</p>
           <div className="mt-8 space-y-3 text-left max-w-xs mx-auto">
@@ -42,7 +42,7 @@ export default function Register() {
 
       <div className="flex-1 flex items-center justify-center px-6">
         <div className="w-full max-w-sm">
-          <div className="lg:hidden text-center mb-8"><div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold"><span className="text-white font-bold">B</span></div><h1 className="text-xl font-display font-bold text-espresso-800">BillAgent</h1></div>
+          <div className="lg:hidden text-center mb-8"><div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold"><span className="text-white font-bold text-2xl">💰</span></div><h1 className="text-xl font-display font-bold text-espresso-800">BillAgent</h1></div>
 
           <form onSubmit={handleRegister} className="glass-card p-6 space-y-4 animate-scale-in">
             <h2 className="text-lg font-bold text-espresso-800 font-display">创建账号</h2>

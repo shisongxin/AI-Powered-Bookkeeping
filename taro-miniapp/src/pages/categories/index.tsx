@@ -9,7 +9,7 @@ import {
 } from '../../shared/api/client'
 import './index.css'
 
-/** 预设图标列表 — 30 个 emoji 预设 */
+/** 预设图标列表 — 32 个 emoji 预设 */
 const PRESET_ICONS = [
   '🍔', '🚗', '🛒', '🏠', '💡', '🍜', '🎮', '💊', '📚', '💰',
   '🔄', '👗', '🧴', '🍎', '🍬', '⚽', '📱', '💄', '🛋️', '👶',
@@ -205,7 +205,7 @@ const CategoriesPage: React.FC = () => {
               </View>
 
               {/* 图标 */}
-              <View className='form-field'>
+              <View className='form-field-full'>
                 <Text className='field-label'>图标</Text>
                 <View className='icon-picker-row'>
                   <View className='icon-picker-wrapper'>
@@ -245,7 +245,7 @@ const CategoriesPage: React.FC = () => {
               </View>
 
               {/* 颜色 */}
-              <View className='form-field'>
+              <View className='form-field-full'>
                 <Text className='field-label'>颜色</Text>
                 <View className='color-picker-row'>
                   <View className='color-native-wrapper'>

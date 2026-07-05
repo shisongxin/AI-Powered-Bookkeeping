@@ -28,8 +28,8 @@ export default function Login() {
         <div className="absolute top-12 left-12 w-24 h-24 rounded-full border border-gold-500/20" />
         <div className="absolute bottom-20 right-16 w-40 h-40 rounded-full border border-gold-500/10" />
         <div className="relative text-center px-12">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold-lg">
-            <span className="text-white font-bold text-xl">B</span>
+          <div className="w-28 h-28 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold-lg">
+            <span className="text-white font-bold text-4xl">💰</span>
           </div>
           <h1 className="text-3xl font-display font-bold text-white mb-3 tracking-tight">BillAgent</h1>
           <p className="text-espresso-300 leading-relaxed">AI 驱动的智能记账助手<br/>让每一笔账都清晰可见</p>
@@ -47,7 +47,7 @@ export default function Login() {
       <div className="flex-1 flex items-center justify-center px-6">
         <div className="w-full max-w-sm">
           <div className="lg:hidden text-center mb-8">
-            <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold"><span className="text-white font-bold">B</span></div>
+            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-gold-400 to-gold-600 flex items-center justify-center shadow-gold"><span className="text-white font-bold text-2xl">💰</span></div>
             <h1 className="text-xl font-display font-bold text-espresso-800">BillAgent</h1>
           </div>
 
