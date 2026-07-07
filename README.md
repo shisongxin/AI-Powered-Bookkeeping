@@ -166,12 +166,12 @@
 
 ### 流水分析
 
-<img src="figure/analysis-page.PNG" width="520" alt="Analysis Web"/>
+<img src="figure/analysispage.PNG" width="520" alt="Analysis Web"/>
 
 <details>
 <summary>📱 手机端流水分析视图</summary>
 <br/>
-<img src="figure/analysispage.png" width="180" alt="Analysis Mobile"/>
+<img src="figure/analysis-page.png" width="180" alt="Analysis Mobile"/>
 </details>
 
 - 月度收支汇总卡片
@@ -183,7 +183,13 @@
 
 ### 账单明细
 
-<img src="figure/bills-page.PNG" width="520" alt="Bills"/>
+<img src="figure/bills-page-web.PNG" width="520" alt="Analysis Web"/>
+
+<details>
+<summary>📱 手机端账单明细视图</summary>
+<br/>
+<img src="figure/bills-page.png" width="180" alt="Analysis Mobile"/>
+</details>
 
 - 按月折叠卡片展示
 - 关键词搜索 + 分类/日期/类型筛选
@@ -194,12 +200,12 @@
 
 ### AI 对话记账
 
-<img src="figure/chat-page.PNG" width="520" alt="AI Chat"/>
+<img src="figure/chat-page-web.PNG" width="520" alt="Analysis Web"/>
 
 <details>
-<summary>💬 更多 AI 对话示例</summary>
+<summary>📱 手机端 AI 对话视图</summary>
 <br/>
-<img src="figure/image.png" width="520" alt="AI Chat Example"/>
+<img src="figure/chat-page.png" width="180" alt="Analysis Mobile"/>
 </details>
 
 - SSE 流式输出，实时状态指示器
@@ -212,7 +218,13 @@
 
 ### 分类管理
 
-<img src="figure/categories-page.PNG" width="520" alt="Categories"/>
+<img src="figure/categories-page-web.PNG" width="520" alt="Analysis Web"/>
+
+<details>
+<summary>📱 手机端分类管理视图</summary>
+<br/>
+<img src="figure/categories-page.png" width="180" alt="Analysis Mobile"/>
+</details>
 
 - 卡片网格 + 图标/颜色/关键词管理
 - 30 个预设图标 + 10 个预设颜色
@@ -222,7 +234,13 @@
 
 ### 预算管理
 
-<img src="figure/budget-page.PNG" width="520" alt="Budget"/>
+<img src="figure/budget-demo.PNG" width="520" alt="Analysis Web"/>
+
+<details>
+<summary>📱 手机端预算管理视图</summary>
+<br/>
+<img src="figure/budget-page.png" width="180" alt="Analysis Mobile"/>
+</details>
 
 - 预算执行进度 + 状态徽章（正常/接近上限/已超支）
 - 手动设置 + 智能生成（上月消费 + 10%）
