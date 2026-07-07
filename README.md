@@ -166,12 +166,12 @@
 
 ### 流水分析
 
-<img src="figure/analysispage.PNG" width="520" alt="Analysis Web"/>
+<img src="figure/analysispage.png" width="520" alt="Analysis Web"/>
 
 <details>
 <summary>📱 手机端流水分析视图</summary>
 <br/>
-<img src="figure/analysis-page.png" width="180" alt="Analysis Mobile"/>
+<img src="figure/analysis-page.PNG" width="180" alt="Analysis Mobile"/>
 </details>
 
 - 月度收支汇总卡片
@@ -188,7 +188,7 @@
 <details>
 <summary>📱 手机端账单明细视图</summary>
 <br/>
-<img src="figure/bills-page.png" width="180" alt="Analysis Mobile"/>
+<img src="figure/bills-page.PNG" width="180" alt="Analysis Mobile"/>
 </details>
 
 - 按月折叠卡片展示
@@ -205,7 +205,7 @@
 <details>
 <summary>📱 手机端 AI 对话视图</summary>
 <br/>
-<img src="figure/chat-page.png" width="180" alt="Analysis Mobile"/>
+<img src="figure/chat-page.PNG" width="180" alt="Analysis Mobile"/>
 </details>
 
 - SSE 流式输出，实时状态指示器
@@ -223,7 +223,7 @@
 <details>
 <summary>📱 手机端分类管理视图</summary>
 <br/>
-<img src="figure/categories-page.png" width="180" alt="Analysis Mobile"/>
+<img src="figure/categories-page.PNG" width="180" alt="Analysis Mobile"/>
 </details>
 
 - 卡片网格 + 图标/颜色/关键词管理
@@ -239,7 +239,7 @@
 <details>
 <summary>📱 手机端预算管理视图</summary>
 <br/>
-<img src="figure/budget-page.png" width="180" alt="Analysis Mobile"/>
+<img src="figure/budget-page.PNG" width="180" alt="Analysis Mobile"/>
 </details>
 
 - 预算执行进度 + 状态徽章（正常/接近上限/已超支）
